@@ -160,7 +160,7 @@ Example:
   :render
   (let ((set-date (use-journal-set-date)))
     (vui-hstack
-     :spacing 2
+     :spacing 1
      (vui-button "< Yesterday"
        :on-click (lambda ()
                    (let ((date (use-journal-date)))
@@ -180,7 +180,7 @@ Example:
 (defcustom vulpea-journal-ui-calendar-week-start 1
   "Day to start week on. 0 = Sunday, 1 = Monday."
   :type '(choice (const :tag "Sunday" 0)
-                 (const :tag "Monday" 1))
+          (const :tag "Monday" 1))
   :group 'vulpea-journal-ui)
 
 (defcomponent journal-calendar ()
@@ -220,8 +220,8 @@ Example:
                                           (if (= month 1) 12 (1- month))
                                           (if (= month 1) (1- year) year)))))
       (vui-box (vui-text (format "%s %d" month-name year) :face 'bold)
-               :width 15
-               :align :center)
+        :width 15
+        :align :center)
       (vui-button ">"
         :on-click (lambda ()
                     (funcall set-date
@@ -236,7 +236,7 @@ Example:
        (apply #'vui-hstack :spacing 1
               (mapcar (lambda (d)
                         (vui-box (vui-text d :face 'shadow)
-                                 :width 3 :align :center))
+                          :width 3 :align :center))
                       day-names)))
      ;; Calendar grid
      (vui-fragment
@@ -315,7 +315,7 @@ Example:
        :on-click (lambda () (vulpea-visit note t)))
      (when tags
        (vui-text (string-join (mapcar (lambda (tag) (concat "#" tag)) tags) " ")
-                 :face 'shadow)))))
+         :face 'shadow)))))
 
 (defcomponent journal-created-today ()
   :state ((notes nil)
@@ -424,7 +424,7 @@ Example:
                              (vui-text (string-join
                                         (mapcar (lambda (tag) (concat "#" tag)) tags)
                                         " ")
-                                       :face 'shadow)))))
+                               :face 'shadow)))))
                       #'vulpea-note-id))))))))
 
 ;;; Previous Years Widget
@@ -495,7 +495,7 @@ Example:
       (vui-text (format "(%d year%s ago)"
                         years-ago
                         (if (= years-ago 1) "" "s"))
-                :face 'shadow))
+        :face 'shadow))
      (when (and expanded preview)
        (vui-vstack
         :indent 4
@@ -555,10 +555,9 @@ Example:
   (let ((date (use-journal-date))
         (widgets (vulpea-journal-ui--get-enabled-widgets)))
     (vui-vstack
-     :spacing 1
      ;; Header
      (vui-text (format-time-string "Journal: %Y-%m-%d %A" date)
-               :face 'vulpea-journal-ui-header)
+       :face 'vulpea-journal-ui-header)
      (vui-newline)
      ;; Navigation
      (vui-component 'journal-nav-bar)
@@ -568,7 +567,7 @@ Example:
      ;; Widgets from registry
      (if (null widgets)
          (vui-text "No widgets configured. See `vulpea-journal-ui-widgets'."
-                   :face 'shadow)
+           :face 'shadow)
        (apply #'vui-fragment
               (mapcan (lambda (widget-entry)
                         (let* ((name (car widget-entry))
