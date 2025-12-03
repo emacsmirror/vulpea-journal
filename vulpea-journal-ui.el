@@ -239,9 +239,10 @@ SET-DATE is callback to change date."
          (year (decoded-time-year decoded))
          (current-day (decoded-time-day decoded))
          ;; Get days with entries
-         (entry-days (mapcar (lambda (d)
-                               (decoded-time-day (decode-time d)))
-                             (vulpea-journal-dates-in-month month year)))
+         (entry-days (use-memo (month year)
+                       (mapcar (lambda (d)
+                                 (decoded-time-day (decode-time d)))
+                               (vulpea-journal-dates-in-month month year))))
          ;; Today info
          (today (decode-time))
          (today-day (decoded-time-day today))
