@@ -22,15 +22,12 @@
 (require 'vulpea)
 (require 'vulpea-db)
 (require 'vulpea-journal)
-(require 'vulpea-journal-widget)
-(require 'vulpea-journal-widgets)
 
 ;; Declare variables for dynamic binding in lexical-binding mode
 (defvar vulpea-directory)
 (defvar vulpea-db-location)
 (defvar vulpea-db-sync-directories)
 (defvar vulpea-journal-default-template)
-(defvar vulpea-journal-widget-previous-years-handle-leap-year)
 
 ;;; Test Infrastructure
 
@@ -134,90 +131,6 @@
                :path "/notes/project.org"
                :tags '("project"))))
     (should-not (vulpea-journal--date-from-note note))))
-
-;;; Widget Definition Tests
-
-(ert-deftest vulpea-journal-define-widget-basic ()
-  "Test widget definition macro."
-  (vulpea-journal-define-widget test-widget
-    :title "Test Widget"
-    :order 100
-    :query (lambda (_date) '("item1" "item2"))
-    :render (lambda (item) (format "- %s" item)))
-  (let ((widget (vulpea-journal-get-widget 'test-widget)))
-    (should widget)
-    (should (string= (vulpea-journal-widget-title widget) "Test Widget"))
-    (should (= (vulpea-journal-widget-order widget) 100))
-    (should (vulpea-journal-widget-collapsible widget))))
-
-(ert-deftest vulpea-journal-define-widget-defaults ()
-  "Test widget definition with defaults."
-  (vulpea-journal-define-widget test-widget-defaults
-    :title "Defaults Test"
-    :query #'ignore
-    :render #'identity)
-  (let ((widget (vulpea-journal-get-widget 'test-widget-defaults)))
-    (should widget)
-    (should (= (vulpea-journal-widget-order widget) 50))
-    (should (vulpea-journal-widget-collapsible widget))
-    (should-not (vulpea-journal-widget-default-collapsed widget))))
-
-;;; Widget State Tests
-
-(ert-deftest vulpea-journal-widget-collapsed-state ()
-  "Test widget collapsed state tracking."
-  (vulpea-journal-define-widget state-test-widget
-    :title "State Test"
-    :default-collapsed t
-    :query #'ignore
-    :render #'identity)
-  (with-temp-buffer
-    (setq-local vulpea-journal--widget-states nil)
-    ;; Default state
-    (should (vulpea-journal--widget-collapsed-p 'state-test-widget))
-    ;; Change state
-    (vulpea-journal--set-widget-collapsed 'state-test-widget nil)
-    (should-not (vulpea-journal--widget-collapsed-p 'state-test-widget))
-    ;; Change back
-    (vulpea-journal--set-widget-collapsed 'state-test-widget t)
-    (should (vulpea-journal--widget-collapsed-p 'state-test-widget))))
-
-;;; Built-in Widget Query Tests
-
-(ert-deftest vulpea-journal-widget-calendar-query ()
-  "Test calendar widget query structure."
-  (let ((date (encode-time 0 0 12 25 11 2024)))
-    (let* ((result (vulpea-journal-widget-calendar-query date))
-           (data (car result)))  ; query returns single-item list
-      (should (= (length result) 1))
-      (should (plist-get data :month))
-      (should (plist-get data :year))
-      (should (= (plist-get data :month) 11))
-      (should (= (plist-get data :year) 2024)))))
-
-;;; Leap Year Tests
-
-(ert-deftest vulpea-journal-anniversary-regular ()
-  "Test anniversary dates for regular day."
-  (let ((vulpea-journal-widget-previous-years-handle-leap-year t))
-    (let ((dates (vulpea-journal--dates-for-anniversary 6 15 2023)))
-      (should (= (length dates) 1)))))
-
-(ert-deftest vulpea-journal-anniversary-march-1-leap ()
-  "Test March 1 includes Feb 29 in leap year."
-  (let ((vulpea-journal-widget-previous-years-handle-leap-year t))
-    (let ((dates (vulpea-journal--dates-for-anniversary 3 1 2024)))
-      ;; Should include both Feb 29 and Mar 1 for leap year
-      (should (= (length dates) 2)))))
-
-(ert-deftest vulpea-journal-anniversary-feb-29-non-leap ()
-  "Test Feb 29 includes Feb 28 in non-leap year."
-  (let ((vulpea-journal-widget-previous-years-handle-leap-year t))
-    (let ((dates (vulpea-journal--dates-for-anniversary 2 29 2023)))
-      ;; Should fallback to Feb 28 in non-leap year
-      (should (= (length dates) 1))
-      (let* ((decoded (decode-time (car dates))))
-        (should (= (decoded-time-day decoded) 28))))))
 
 ;;; Full Integration Test
 

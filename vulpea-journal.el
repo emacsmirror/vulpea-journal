@@ -31,20 +31,19 @@
 ;;
 ;;; Commentary:
 ;;
-;; vulpea-journal (also known as vulpea-zilnic) provides a day-centric
-;; interface for daily note workflows. It creates a focused workspace
-;; with today's journal note and contextual widgets.
+;; vulpea-journal provides a day-centric interface for daily note
+;; workflows. It creates a focused workspace with today's journal
+;; note and contextual widgets powered by vui.el.
 ;;
 ;; Main features:
 ;; - Daily note identification and navigation
 ;; - Two-window layout: org buffer + widgets buffer
-;; - Extensible widget system (see vulpea-journal-widget.el)
+;; - Reactive widget system using vui.el
 ;; - Calendar integration
 ;;
 ;; Quick start:
 ;;
 ;;   (require 'vulpea-journal)
-;;   (setq vulpea-journal-directory "journal/")
 ;;   (global-set-key (kbd "C-c j") #'vulpea-journal)
 ;;
 ;;; Code:
@@ -52,15 +51,10 @@
 (require 'vulpea)
 (require 'vulpea-db)
 (require 'vulpea-db-query)
+(require 'vui)
 (require 'calendar)
 
 (defvar vulpea-directory)
-
-(declare-function vulpea-journal-widget--render-widget-list "vulpea-journal-widget")
-(declare-function vulpea-journal-calendar-left "vulpea-journal-widgets")
-(declare-function vulpea-journal-calendar-right "vulpea-journal-widgets")
-(declare-function vulpea-journal-calendar-up "vulpea-journal-widgets")
-(declare-function vulpea-journal-calendar-down "vulpea-journal-widgets")
 
 ;;; Customization
 
@@ -128,28 +122,6 @@ The widgets buffer takes the remaining space."
 (defcustom vulpea-journal-widgets-buffer-name "*vulpea-journal*"
   "Name for the journal widgets buffer."
   :type 'string
-  :group 'vulpea-journal)
-
-;;; Faces
-
-(defface vulpea-journal-header-face
-  '((t :inherit org-document-title :height 1.3))
-  "Face for journal view header."
-  :group 'vulpea-journal)
-
-(defface vulpea-journal-date-face
-  '((t :inherit org-date))
-  "Face for dates in journal view."
-  :group 'vulpea-journal)
-
-(defface vulpea-journal-widget-title-face
-  '((t :inherit org-level-2 :height 1.1))
-  "Face for widget titles."
-  :group 'vulpea-journal)
-
-(defface vulpea-journal-meta-face
-  '((t :inherit font-lock-comment-face :height 0.9))
-  "Face for metadata."
   :group 'vulpea-journal)
 
 ;;; Template Resolution
@@ -289,24 +261,6 @@ Returns time value or nil if not a journal note."
   "Get or create buffer for NOTE."
   (find-file-noselect (vulpea-note-path note)))
 
-(defun vulpea-journal--get-widgets-buffer (date)
-  "Get or create widgets buffer for DATE."
-  (let ((buffer (get-buffer-create vulpea-journal-widgets-buffer-name)))
-    (with-current-buffer buffer
-      (unless (derived-mode-p 'vulpea-journal-widgets-mode)
-        (vulpea-journal-widgets-mode))
-      (setq-local vulpea-journal--current-date date))
-    buffer))
-
-(defun vulpea-journal--link-buffers (note-buffer widgets-buffer date)
-  "Link NOTE-BUFFER and WIDGETS-BUFFER for DATE."
-  (with-current-buffer note-buffer
-    (setq-local vulpea-journal--widgets-buffer widgets-buffer)
-    (setq-local vulpea-journal--current-date date))
-  (with-current-buffer widgets-buffer
-    (setq-local vulpea-journal--note-buffer note-buffer)
-    (setq-local vulpea-journal--current-date date)))
-
 (defun vulpea-journal--setup-windows (note-buffer widgets-buffer)
   "Set up two-window layout with NOTE-BUFFER and WIDGETS-BUFFER."
   (delete-other-windows)
@@ -322,15 +276,27 @@ Returns time value or nil if not a journal note."
 
 ;;;###autoload
 (defun vulpea-journal (&optional date)
-  "Open journal view for DATE (defaults to today)."
+  "Open journal view for DATE (defaults to today).
+Creates a two-window layout with the journal note on the left
+and interactive widgets on the right."
   (interactive)
+  (require 'vulpea-journal-ui)
   (let* ((date (or date (current-time)))
          (note (vulpea-journal-note date))
-         (note-buffer (vulpea-journal--get-note-buffer note))
-         (widgets-buffer (vulpea-journal--get-widgets-buffer date)))
-    (vulpea-journal--link-buffers note-buffer widgets-buffer date)
-    (vulpea-journal--setup-windows note-buffer widgets-buffer)
-    (vulpea-journal-refresh-widgets)))
+         (note-buffer (vulpea-journal--get-note-buffer note)))
+    ;; Mount vui widgets
+    (vui-mount (vui-component 'journal-root :initial-date date)
+               vulpea-journal-widgets-buffer-name)
+    (let ((widgets-buffer (get-buffer vulpea-journal-widgets-buffer-name)))
+      ;; Link buffers
+      (with-current-buffer note-buffer
+        (setq-local vulpea-journal--widgets-buffer widgets-buffer)
+        (setq-local vulpea-journal--current-date date))
+      (with-current-buffer widgets-buffer
+        (setq-local vulpea-journal--note-buffer note-buffer)
+        (setq-local vulpea-journal--current-date date))
+      ;; Set up windows
+      (vulpea-journal--setup-windows note-buffer widgets-buffer))))
 
 ;;;###autoload
 (defun vulpea-journal-today ()
@@ -351,159 +317,6 @@ When called interactively, prompt for date."
          (date-string (org-read-date nil nil nil prompt)))
     (org-time-string-to-time date-string)))
 
-;;;###autoload
-(defun vulpea-journal-goto-date (date)
-  "Navigate current journal view to DATE."
-  (interactive (list (vulpea-journal--read-date "Go to date: ")))
-  (when-let ((widgets-buffer (or vulpea-journal--widgets-buffer
-                                 (get-buffer vulpea-journal-widgets-buffer-name))))
-    (let* ((note (vulpea-journal-note date))
-           (note-buffer (vulpea-journal--get-note-buffer note)))
-      ;; Update note buffer
-      (when-let ((note-window (get-buffer-window vulpea-journal--note-buffer)))
-        (set-window-buffer note-window note-buffer))
-      ;; Update state and refresh
-      (vulpea-journal--link-buffers note-buffer widgets-buffer date)
-      (vulpea-journal-refresh-widgets))))
-
-(defun vulpea-journal-yesterday ()
-  "Navigate to yesterday's journal."
-  (interactive)
-  (let ((yesterday (time-subtract (or vulpea-journal--current-date (current-time))
-                                  (days-to-time 1))))
-    (vulpea-journal-goto-date yesterday)))
-
-(defun vulpea-journal-tomorrow ()
-  "Navigate to tomorrow's journal."
-  (interactive)
-  (let ((tomorrow (time-add (or vulpea-journal--current-date (current-time))
-                            (days-to-time 1))))
-    (vulpea-journal-goto-date tomorrow)))
-
-(defun vulpea-journal-goto-today ()
-  "Navigate to today's journal."
-  (interactive)
-  (vulpea-journal-goto-date (current-time)))
-
-;;; Widgets Mode
-
-(defvar vulpea-journal-widgets-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "g") #'vulpea-journal-refresh-widgets)
-    (define-key map (kbd "r") #'vulpea-journal-refresh-widgets)
-    (define-key map (kbd "q") #'vulpea-journal-quit)
-    (define-key map (kbd "N") #'vulpea-journal-tomorrow)
-    (define-key map (kbd "P") #'vulpea-journal-yesterday)
-    (define-key map (kbd "d") #'vulpea-journal-goto-date)
-    (define-key map (kbd ".") #'vulpea-journal-goto-today)
-    (define-key map (kbd "n") #'vulpea-journal-next-widget)
-    (define-key map (kbd "p") #'vulpea-journal-previous-widget)
-    (define-key map (kbd "TAB") #'vulpea-journal-toggle-widget)
-    (define-key map (kbd "RET") #'vulpea-journal-action-at-point)
-    (define-key map (kbd "e") #'vulpea-journal-edit-note)
-    ;; Calendar navigation (cell-based when in calendar)
-    (define-key map (kbd "<left>") #'vulpea-journal-calendar-left)
-    (define-key map (kbd "<right>") #'vulpea-journal-calendar-right)
-    (define-key map (kbd "<up>") #'vulpea-journal-calendar-up)
-    (define-key map (kbd "<down>") #'vulpea-journal-calendar-down)
-    (define-key map (kbd "C-b") #'vulpea-journal-calendar-left)
-    (define-key map (kbd "C-f") #'vulpea-journal-calendar-right)
-    (define-key map (kbd "C-p") #'vulpea-journal-calendar-up)
-    (define-key map (kbd "C-n") #'vulpea-journal-calendar-down)
-    map)
-  "Keymap for `vulpea-journal-widgets-mode'.")
-
-(define-derived-mode vulpea-journal-widgets-mode special-mode "Journal"
-  "Major mode for vulpea journal widgets buffer.
-
-\\{vulpea-journal-widgets-mode-map}"
-  :group 'vulpea-journal
-  (setq-local buffer-read-only t)
-  (setq-local truncate-lines t))
-
-;;; Widget Rendering (stub - implemented in vulpea-journal-widget.el)
-
-(defvar vulpea-journal-widgets nil
-  "List of enabled widgets to display.
-Each element is a symbol naming a widget.")
-
-(defun vulpea-journal-refresh-widgets ()
-  "Refresh all widgets in the current journal view."
-  (interactive)
-  (when-let ((buffer (or vulpea-journal--widgets-buffer
-                         (and (derived-mode-p 'vulpea-journal-widgets-mode)
-                              (current-buffer))
-                         (get-buffer vulpea-journal-widgets-buffer-name))))
-    (with-current-buffer buffer
-      (vulpea-journal--render-widgets))))
-
-(defun vulpea-journal--render-widgets (&optional use-cache)
-  "Render all widgets in current buffer.
-If USE-CACHE is non-nil, use cached query results."
-  (let ((inhibit-read-only t)
-        (date vulpea-journal--current-date))
-    (erase-buffer)
-    ;; Header
-    (insert (propertize (format-time-string "Journal: %Y-%m-%d %A" date)
-                        'face 'vulpea-journal-header-face))
-    (insert "\n")
-    (vulpea-journal--render-nav-bar date)
-    (insert "\n\n")
-    ;; Widgets (to be implemented by vulpea-journal-widget.el)
-    (if (and (boundp 'vulpea-journal-widgets) vulpea-journal-widgets)
-        (vulpea-journal--render-widget-list date use-cache)
-      (insert (propertize "No widgets configured.\n"
-                          'face 'vulpea-journal-meta-face)
-              (propertize "See `vulpea-journal-widgets' to enable widgets.\n"
-                          'face 'vulpea-journal-meta-face)))))
-
-(defun vulpea-journal--render-nav-bar (_date)
-  "Render navigation bar for DATE."
-  (insert (propertize "[" 'face 'shadow))
-  (insert-text-button "◂ Yesterday"
-                      'action (lambda (_) (vulpea-journal-yesterday))
-                      'follow-link t)
-  (insert (propertize "]" 'face 'shadow))
-  (insert "  ")
-  (insert (propertize "[" 'face 'shadow))
-  (insert-text-button "Today ⟳"
-                      'action (lambda (_) (vulpea-journal-goto-today))
-                      'follow-link t)
-  (insert (propertize "]" 'face 'shadow))
-  (insert "  ")
-  (insert (propertize "[" 'face 'shadow))
-  (insert-text-button "Tomorrow ▸"
-                      'action (lambda (_) (vulpea-journal-tomorrow))
-                      'follow-link t)
-  (insert (propertize "]" 'face 'shadow))
-  (insert "     ")
-  (insert (propertize "[" 'face 'shadow))
-  (insert-text-button "r"
-                      'action (lambda (_) (vulpea-journal-refresh-widgets))
-                      'follow-link t
-                      'help-echo "Refresh widgets")
-  (insert (propertize "] Refresh" 'face 'shadow))
-  (insert "  ")
-  (insert (propertize "[" 'face 'shadow))
-  (insert-text-button "q"
-                      'action (lambda (_) (vulpea-journal-quit))
-                      'follow-link t
-                      'help-echo "Quit journal view")
-  (insert (propertize "] Quit" 'face 'shadow)))
-
-(defun vulpea-journal--render-widget-list (date &optional use-cache)
-  "Render enabled widgets for DATE.
-If USE-CACHE is non-nil, use cached query results.
-Calls the actual implementation from vulpea-journal-widget.el if loaded."
-  (if (featurep 'vulpea-journal-widget)
-      ;; Widget module is loaded, let it handle rendering
-      (vulpea-journal-widget--render-widget-list date use-cache)
-    ;; Stub when widget module not loaded
-    (insert (propertize "Widgets will appear here.\n"
-                        'face 'vulpea-journal-meta-face)
-            (propertize "(Load vulpea-journal-widget for full functionality)\n"
-                        'face 'vulpea-journal-meta-face))))
-
 ;;; Navigation Commands
 
 (defun vulpea-journal-quit ()
@@ -519,33 +332,6 @@ Calls the actual implementation from vulpea-journal-widget.el if loaded."
   (interactive)
   (when vulpea-journal--note-buffer
     (select-window (get-buffer-window vulpea-journal--note-buffer))))
-
-(defun vulpea-journal-next-widget ()
-  "Move to next widget."
-  (interactive)
-  ;; TODO: implement once widget system is ready
-  (forward-paragraph))
-
-(defun vulpea-journal-previous-widget ()
-  "Move to previous widget."
-  (interactive)
-  ;; TODO: implement once widget system is ready
-  (backward-paragraph))
-
-(defun vulpea-journal-toggle-widget ()
-  "Toggle expansion of widget at point."
-  (interactive)
-  ;; TODO: implement once widget system is ready
-  (message "Toggle widget (not yet implemented)"))
-
-(defun vulpea-journal-action-at-point ()
-  "Execute action at point."
-  (interactive)
-  (if-let ((action (get-text-property (point) 'action)))
-      (funcall action (get-text-property (point) 'action-data))
-    (if-let ((button (button-at (point))))
-        (button-activate button)
-      (message "No action at point"))))
 
 ;;; Calendar Integration
 
@@ -576,17 +362,6 @@ Calls the actual implementation from vulpea-journal-widget.el if loaded."
       (vulpea-journal (encode-time 0 0 0
                                    (nth 1 date)   ; day
                                    (nth 0 date)   ; month
-                                   (nth 2 date))) ; year
-      )))
-
-(defun vulpea-journal-calendar-open-view ()
-  "Open journal view for date at point in calendar."
-  (interactive)
-  (let ((date (calendar-cursor-to-date t)))
-    (when date
-      (vulpea-journal (encode-time 0 0 0
-                                   (nth 1 date)
-                                   (nth 0 date)
                                    (nth 2 date))))))
 
 ;;;###autoload
@@ -597,8 +372,7 @@ Call this in your init file to enable calendar marks and keybindings."
   (add-hook 'calendar-today-invisible-hook #'vulpea-journal-calendar-mark-entries)
   ;; Add keybindings to calendar mode
   (with-eval-after-load 'calendar
-    (define-key calendar-mode-map (kbd "j") #'vulpea-journal-calendar-open)
-    (define-key calendar-mode-map (kbd "J") #'vulpea-journal-calendar-open-view)))
+    (define-key calendar-mode-map (kbd "j") #'vulpea-journal-calendar-open)))
 
 (provide 'vulpea-journal)
 ;;; vulpea-journal.el ends here
