@@ -45,7 +45,7 @@
 ;;
 ;;   (defcomponent my-widget-component ()
 ;;     :render
-;;     (let ((date (use-journal-date)))
+;;     (let ((date (use-vui-journal-date)))
 ;;       (vui-vstack
 ;;        (vui-text "My Widget" :face 'vulpea-journal-ui-widget-title)
 ;;        ...)))
@@ -66,7 +66,7 @@
 (declare-function vulpea-journal-find-note "vulpea-journal")
 (declare-function vulpea-journal-note "vulpea-journal")
 (declare-function vulpea-journal-note-p "vulpea-journal")
-(declare-function vulpea-journal-dates-in-month "vulpea-journal")
+(declare-function vulpea-vui-journal-dates-in-month "vulpea-journal")
 (declare-function vulpea-journal--date-from-note "vulpea-journal")
 
 (defvar vulpea-journal-widgets-buffer-name)
@@ -74,9 +74,9 @@
 ;;; Contexts
 ;; Share data across the component tree without prop drilling
 
-(defcontext journal-date)
-(defcontext journal-set-date)
-(defcontext journal-note-buffer)
+(defcontext vui-journal-date)
+(defcontext vui-journal-set-date)
+(defcontext vui-journal-note-buffer)
 
 ;;; Faces
 
@@ -156,14 +156,14 @@ Example:
 
 ;;; Navigation Bar Component
 
-(defcomponent journal-nav-bar ()
+(defcomponent vui-journal-nav-bar ()
   :render
-  (let ((set-date (use-journal-set-date)))
+  (let ((set-date (use-vui-journal-set-date)))
     (vui-hstack
      :spacing 1
      (vui-button "< Yesterday"
        :on-click (lambda ()
-                   (let ((date (use-journal-date)))
+                   (let ((date (use-vui-journal-date)))
                      (funcall set-date
                               (time-subtract date (days-to-time 1))))))
      (vui-button "Today"
@@ -171,7 +171,7 @@ Example:
                    (funcall set-date (current-time))))
      (vui-button "Tomorrow >"
        :on-click (lambda ()
-                   (let ((date (use-journal-date)))
+                   (let ((date (use-vui-journal-date)))
                      (funcall set-date
                               (time-add date (days-to-time 1)))))))))
 
@@ -183,10 +183,10 @@ Example:
           (const :tag "Monday" 1))
   :group 'vulpea-journal-ui)
 
-(defcomponent journal-calendar ()
+(defcomponent vui-journal-calendar ()
   :render
-  (let* ((date (use-journal-date))
-         (set-date (use-journal-set-date))
+  (let* ((date (use-vui-journal-date))
+         (set-date (use-vui-journal-set-date))
          (decoded (decode-time date))
          (month (decoded-time-month decoded))
          (year (decoded-time-year decoded))
@@ -194,7 +194,7 @@ Example:
          ;; Get days with entries
          (entry-days (mapcar (lambda (d)
                                (decoded-time-day (decode-time d)))
-                             (vulpea-journal-dates-in-month month year)))
+                             (vulpea-vui-journal-dates-in-month month year)))
          ;; Today info
          (today (decode-time))
          (today-day (decoded-time-day today))
@@ -299,7 +299,7 @@ Example:
             (or (not vulpea-journal-ui-created-today-exclude-journal)
                 (not (vulpea-journal-note-p note))))))))
 
-(defcomponent journal-note-item (note)
+(defcomponent vui-journal-note-item (note)
   :render
   (let* ((title (vulpea-note-title note))
          (tags (vulpea-note-tags note))
@@ -317,20 +317,20 @@ Example:
        (vui-text (string-join (mapcar (lambda (tag) (concat "#" tag)) tags) " ")
          :face 'shadow)))))
 
-(defcomponent journal-created-today ()
+(defcomponent vui-journal-created-today ()
   :state ((notes nil)
           (loading t)
           (collapsed nil))
 
   :on-mount
-  (let ((date (use-journal-date)))
+  (let ((date (use-vui-journal-date)))
     (vui-batch
      (vui-set-state :notes (vulpea-journal-ui--query-created-today date))
      (vui-set-state :loading nil)))
 
   :on-update
   ;; Reload when date changes
-  (let ((date (use-journal-date))
+  (let ((date (use-vui-journal-date))
         (prev-date (plist-get prev-props :date)))
     (unless (equal date prev-date)
       (vui-batch
@@ -359,7 +359,7 @@ Example:
             :indent 2
             (vui-list notes
                       (lambda (note)
-                        (vui-component 'journal-note-item
+                        (vui-component 'vui-journal-note-item
                           :key (vulpea-note-id note)
                           :note note))
                       #'vulpea-note-id))))))))
@@ -372,19 +372,19 @@ Example:
               (today-id (vulpea-note-id today-note)))
     (vulpea-db-query-by-links-some (list today-id))))
 
-(defcomponent journal-links-to-today ()
+(defcomponent vui-journal-links-to-today ()
   :state ((notes nil)
           (loading t)
           (collapsed nil))
 
   :on-mount
-  (let ((date (use-journal-date)))
+  (let ((date (use-vui-journal-date)))
     (vui-batch
      (vui-set-state :notes (vulpea-journal-ui--query-links-to-today date))
      (vui-set-state :loading nil)))
 
   :on-update
-  (let ((date (use-journal-date))
+  (let ((date (use-vui-journal-date))
         (prev-date (plist-get prev-props :date)))
     (unless (equal date prev-date)
       (vui-batch
@@ -472,7 +472,7 @@ Example:
           (when (< start end)
             (string-trim (buffer-substring-no-properties start end))))))))
 
-(defcomponent journal-previous-year-entry (entry)
+(defcomponent vui-journal-previous-year-entry (entry)
   :state ((expanded nil))
 
   :render
@@ -501,19 +501,19 @@ Example:
         :indent 4
         (vui-text (concat preview "...") :face 'font-lock-comment-face))))))
 
-(defcomponent journal-previous-years ()
+(defcomponent vui-journal-previous-years ()
   :state ((entries nil)
           (loading t)
           (collapsed nil))
 
   :on-mount
-  (let ((date (use-journal-date)))
+  (let ((date (use-vui-journal-date)))
     (vui-batch
      (vui-set-state :entries (vulpea-journal-ui--query-previous-years date))
      (vui-set-state :loading nil)))
 
   :on-update
-  (let ((date (use-journal-date))
+  (let ((date (use-vui-journal-date))
         (prev-date (plist-get prev-props :date)))
     (unless (equal date prev-date)
       (vui-batch
@@ -542,7 +542,7 @@ Example:
             :indent 2
             (vui-list entries
                       (lambda (entry)
-                        (vui-component 'journal-previous-year-entry
+                        (vui-component 'vui-journal-previous-year-entry
                           :key (format-time-string "%Y%m%d" (plist-get entry :date))
                           :entry entry))
                       (lambda (entry)
@@ -550,9 +550,9 @@ Example:
 
 ;;; Main Journal View Component
 
-(defcomponent journal-widgets-view ()
+(defcomponent vui-journal-widgets-view ()
   :render
-  (let ((date (use-journal-date))
+  (let ((date (use-vui-journal-date))
         (widgets (vulpea-journal-ui--get-enabled-widgets)))
     (vui-vstack
      ;; Header
@@ -560,7 +560,7 @@ Example:
        :face 'vulpea-journal-ui-header)
      (vui-newline)
      ;; Navigation
-     (vui-component 'journal-nav-bar)
+     (vui-component 'vui-journal-nav-bar)
      (vui-newline)
      (vui-text (make-string 40 ?─))
      (vui-newline)
@@ -579,7 +579,7 @@ Example:
 
 ;;; Root Component with Context Providers
 
-(defcomponent journal-root (initial-date)
+(defcomponent vui-journal-root (initial-date)
   :state ((date nil))
 
   :on-mount
@@ -587,12 +587,12 @@ Example:
     (vui-set-state :date (or initial-date (current-time))))
 
   :render
-  (journal-date-provider
+  (vui-journal-date-provider
       (or date (current-time))
-    (journal-set-date-provider
+    (vui-journal-set-date-provider
         (lambda (new-date)
           (vui-set-state :date new-date))
-      (vui-component 'journal-widgets-view))))
+      (vui-component 'vui-journal-widgets-view))))
 
 ;;; Public API
 
@@ -602,7 +602,7 @@ Example:
 DATE defaults to today."
   (interactive)
   (let ((buffer-name (or vulpea-journal-widgets-buffer-name "*vulpea-journal*")))
-    (vui-mount (vui-component 'journal-root
+    (vui-mount (vui-component 'vui-journal-root
                  :initial-date (or date (current-time)))
                buffer-name)
     (pop-to-buffer buffer-name)))
@@ -611,22 +611,22 @@ DATE defaults to today."
 
 (vulpea-journal-ui-register-widget
  'calendar
- :component 'journal-calendar
+ :component 'vui-journal-calendar
  :order 10)
 
 (vulpea-journal-ui-register-widget
  'created-today
- :component 'journal-created-today
+ :component 'vui-journal-created-today
  :order 20)
 
 (vulpea-journal-ui-register-widget
  'links-to-today
- :component 'journal-links-to-today
+ :component 'vui-journal-links-to-today
  :order 30)
 
 (vulpea-journal-ui-register-widget
  'previous-years
- :component 'journal-previous-years
+ :component 'vui-journal-previous-years
  :order 40)
 
 (provide 'vulpea-journal-ui)

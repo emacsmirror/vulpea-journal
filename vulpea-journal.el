@@ -285,7 +285,7 @@ and interactive widgets on the right."
          (note (vulpea-journal-note date))
          (note-buffer (vulpea-journal--get-note-buffer note)))
     ;; Mount vui widgets
-    (vui-mount (vui-component 'journal-root :initial-date date)
+    (vui-mount (vui-component 'vui-journal-root :initial-date date)
                vulpea-journal-widgets-buffer-name)
     (let ((widgets-buffer (get-buffer vulpea-journal-widgets-buffer-name)))
       ;; Link buffers
