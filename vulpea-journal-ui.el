@@ -173,9 +173,7 @@ Example:
 
   :render
   (let ((count (length items))
-        (toggle-collapsed (use-callback (collapsed)
-                            (lambda ()
-                              (vui-set-state :collapsed (not collapsed))))))
+        (toggle-collapsed (lambda () (vui-set-state :collapsed (not collapsed)))))
     (vui-vstack
      ;; Header
      (vui-hstack
@@ -298,18 +296,16 @@ SET-SELECTED-DATE is callback to change selected date."
                 today-day today-month today-year set-selected-date))
          (month-name (calendar-month-name selected-month))
          ;; Navigation callbacks
-         (go-prev-month (use-callback (selected-month selected-year set-selected-date)
-                          (lambda ()
-                            (funcall set-selected-date
-                                     (encode-time 0 0 0 1
-                                                  (if (= selected-month 1) 12 (1- selected-month))
-                                                  (if (= selected-month 1) (1- selected-year) selected-year))))))
-         (go-next-month (use-callback (selected-month selected-year set-selected-date)
-                          (lambda ()
-                            (funcall set-selected-date
-                                     (encode-time 0 0 0 1
-                                                  (if (= selected-month 12) 1 (1+ selected-month))
-                                                  (if (= selected-month 12) (1+ selected-year) selected-year)))))))
+         (go-prev-month (lambda ()
+                          (funcall set-selected-date
+                                   (encode-time 0 0 0 1
+                                                (if (= selected-month 1) 12 (1- selected-month))
+                                                (if (= selected-month 1) (1- selected-year) selected-year)))))
+         (go-next-month (lambda ()
+                          (funcall set-selected-date
+                                   (encode-time 0 0 0 1
+                                                (if (= selected-month 12) 1 (1+ selected-month))
+                                                (if (= selected-month 12) (1+ selected-year) selected-year))))))
     (vui-vstack
      ;; Widget title
      (vui-text "Calendar" :face 'vulpea-journal-ui-widget-title)
@@ -353,8 +349,7 @@ SET-SELECTED-DATE is callback to change selected date."
          (time-str (if (and created (string-match "\\([0-9]+:[0-9]+\\)" created))
                        (match-string 1 created)
                      "     "))
-         (visit-note (use-callback (note)
-                       (lambda () (vulpea-visit note t)))))
+         (visit-note (lambda () (vulpea-visit note t))))
     (vui-hstack
      :spacing 1
      (vui-text time-str :face 'shadow)
@@ -433,10 +428,24 @@ SET-SELECTED-DATE is callback to change selected date."
   :type 'integer
   :group 'vulpea-journal-ui)
 
-(defcustom vulpea-journal-ui-previous-years-preview-chars 150
+(defcustom vulpea-journal-ui-previous-years-preview-chars 256
   "Number of characters to show in preview."
   :type 'integer
   :group 'vulpea-journal-ui)
+
+(defcustom vulpea-journal-ui-previous-years-hide-drawers t
+  "If non-nil, hide org drawers in preview."
+  :type 'boolean
+  :group 'vulpea-journal-ui)
+
+(defun vulpea-journal-ui--strip-drawers (text)
+  "Remove org drawers from TEXT."
+  (with-temp-buffer
+    (insert text)
+    (goto-char (point-min))
+    (while (re-search-forward "^[ \t]*:[A-Z_]+:[ \t]*\n\\(?:.*\n\\)*?[ \t]*:END:[ \t]*\n?" nil t)
+      (replace-match ""))
+    (buffer-string)))
 
 (defun vulpea-journal-ui--query-previous-years (date)
   "Return journal notes from same date in previous years for DATE."
@@ -453,6 +462,13 @@ SET-SELECTED-DATE is callback to change selected date."
                           :note note))))
          (-non-nil))))
 
+(defun vulpea-journal-ui--indent-text (text indent)
+  "Indent each line of TEXT with INDENT spaces."
+  (string-join
+   (--map (concat (make-string indent ?\s) (string-trim-right it))
+          (string-lines text t))
+   "\n"))
+
 (defun vulpea-journal-ui--get-note-preview (note max-chars)
   "Get preview of NOTE content, up to MAX-CHARS."
   (when-let ((path (vulpea-note-path note)))
@@ -460,9 +476,15 @@ SET-SELECTED-DATE is callback to change selected date."
       (with-temp-buffer
         (insert-file-contents path nil 0 (* max-chars 3))
         (goto-char (point-min))
-        ;; Skip front matter
+        ;; Strip drawers if configured
+        (when vulpea-journal-ui-previous-years-hide-drawers
+          (let ((content (vulpea-journal-ui--strip-drawers (buffer-string))))
+            (erase-buffer)
+            (insert content)
+            (goto-char (point-min))))
+        ;; Skip front matter (#+keywords)
         (while (and (not (eobp))
-                    (looking-at "^\\(#\\+\\|:\\|$\\)"))
+                    (looking-at "^\\(#\\+\\|$\\)"))
           (forward-line 1))
         (let ((start (point))
               (end (min (+ (point) max-chars) (point-max))))
@@ -481,11 +503,9 @@ SET-SELECTED-DATE is callback to change selected date."
                     (vulpea-journal-ui--get-note-preview
                      note
                      vulpea-journal-ui-previous-years-preview-chars)))
-         (toggle-expanded (use-callback (expanded)
-                            (lambda ()
-                              (vui-set-state :expanded (not expanded)))))
-         (visit-note (use-callback (note)
-                       (lambda () (vulpea-visit note t)))))
+         (toggle-expanded (lambda ()
+                            (vui-set-state :expanded (not expanded))))
+         (visit-note (lambda () (vulpea-visit note t))))
     (vui-vstack
      (vui-hstack
       :spacing 1
@@ -499,9 +519,8 @@ SET-SELECTED-DATE is callback to change selected date."
                         (if (= years-ago 1) "" "s"))
         :face 'shadow))
      (when (and expanded preview)
-       (vui-vstack
-        :indent 4
-        (vui-text (concat preview "...") :face 'font-lock-comment-face))))))
+       (vui-text (vulpea-journal-ui--indent-text (concat preview "...") 4)
+         :face 'font-lock-comment-face)))))
 
 (defcomponent vui-journal-previous-years ()
   :state ((entries nil))
