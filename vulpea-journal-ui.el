@@ -30,6 +30,30 @@
 ;; This module provides a modern, component-based UI using vui.el.
 ;; Components are reactive and automatically re-render when state changes.
 ;;
+;; Built-in widgets:
+;; - `calendar' - Interactive month calendar
+;; - `created-today' - Notes created on current date
+;; - `links-to-today' - Notes linking to today's journal
+;; - `previous-years' - Same date in previous years
+;;
+;; Creating custom widgets:
+;;
+;;   (vulpea-journal-ui-register-widget
+;;    'my-widget
+;;    :component 'my-widget-component
+;;    :order 25)
+;;
+;;   (defcomponent my-widget-component ()
+;;     :render
+;;     (let ((date (use-journal-date)))
+;;       (vui-vstack
+;;        (vui-text "My Widget" :face 'vulpea-journal-ui-widget-title)
+;;        ...)))
+;;
+;; Then add to `vulpea-journal-ui-widgets':
+;;
+;;   (add-to-list 'vulpea-journal-ui-widgets 'my-widget)
+;;
 ;;; Code:
 
 (require 'vui)
@@ -84,6 +108,51 @@
   '((t :inherit region))
   "Face for selected day in calendar."
   :group 'vulpea-journal-ui)
+
+;;; Widget Registry
+
+(defvar vulpea-journal-ui--widget-registry (make-hash-table :test 'eq)
+  "Registry of available widgets.
+Keys are widget names (symbols), values are plists with:
+  :component - Symbol naming the vui component
+  :order - Number for display order (lower = earlier)")
+
+(defcustom vulpea-journal-ui-widgets
+  '(calendar created-today links-to-today previous-years)
+  "List of widgets to display in journal view.
+Each element is a symbol naming a registered widget.
+Order in this list is secondary to widget :order property."
+  :type '(repeat symbol)
+  :group 'vulpea-journal-ui)
+
+(defun vulpea-journal-ui-register-widget (name &rest props)
+  "Register a widget NAME with PROPS.
+
+PROPS is a plist with:
+  :component - Symbol naming the vui component to render
+  :order - Number for display order (default 50, lower = earlier)
+
+Example:
+  (vulpea-journal-ui-register-widget
+   \\='my-tasks
+   :component \\='my-tasks-widget
+   :order 15)"
+  (puthash name props vulpea-journal-ui--widget-registry))
+
+(defun vulpea-journal-ui-get-widget (name)
+  "Get widget definition for NAME from registry."
+  (gethash name vulpea-journal-ui--widget-registry))
+
+(defun vulpea-journal-ui--get-enabled-widgets ()
+  "Return list of enabled widget definitions, sorted by order."
+  (let ((widgets nil))
+    (dolist (name vulpea-journal-ui-widgets)
+      (when-let ((def (vulpea-journal-ui-get-widget name)))
+        (push (cons name def) widgets)))
+    (sort widgets
+          (lambda (a b)
+            (< (or (plist-get (cdr a) :order) 50)
+               (or (plist-get (cdr b) :order) 50))))))
 
 ;;; Navigation Bar Component
 
@@ -483,7 +552,8 @@
 
 (defcomponent journal-widgets-view ()
   :render
-  (let ((date (use-journal-date)))
+  (let ((date (use-journal-date))
+        (widgets (vulpea-journal-ui--get-enabled-widgets)))
     (vui-vstack
      :spacing 1
      ;; Header
@@ -495,14 +565,18 @@
      (vui-newline)
      (vui-text (make-string 40 ?─))
      (vui-newline)
-     ;; Widgets
-     (vui-component 'journal-calendar)
-     (vui-newline)
-     (vui-component 'journal-created-today)
-     (vui-newline)
-     (vui-component 'journal-links-to-today)
-     (vui-newline)
-     (vui-component 'journal-previous-years))))
+     ;; Widgets from registry
+     (if (null widgets)
+         (vui-text "No widgets configured. See `vulpea-journal-ui-widgets'."
+                   :face 'shadow)
+       (apply #'vui-fragment
+              (mapcan (lambda (widget-entry)
+                        (let* ((name (car widget-entry))
+                               (def (cdr widget-entry))
+                               (component (plist-get def :component)))
+                          (list (vui-component component :key name)
+                                (vui-newline))))
+                      widgets))))))
 
 ;;; Root Component with Context Providers
 
@@ -533,6 +607,28 @@ DATE defaults to today."
                  :initial-date (or date (current-time)))
                buffer-name)
     (pop-to-buffer buffer-name)))
+
+;;; Register Built-in Widgets
+
+(vulpea-journal-ui-register-widget
+ 'calendar
+ :component 'journal-calendar
+ :order 10)
+
+(vulpea-journal-ui-register-widget
+ 'created-today
+ :component 'journal-created-today
+ :order 20)
+
+(vulpea-journal-ui-register-widget
+ 'links-to-today
+ :component 'journal-links-to-today
+ :order 30)
+
+(vulpea-journal-ui-register-widget
+ 'previous-years
+ :component 'journal-previous-years
+ :order 40)
 
 (provide 'vulpea-journal-ui)
 ;;; vulpea-journal-ui.el ends here
