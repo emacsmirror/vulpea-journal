@@ -66,7 +66,7 @@
 (declare-function vulpea-journal-find-note "vulpea-journal")
 (declare-function vulpea-journal-note "vulpea-journal")
 (declare-function vulpea-journal-note-p "vulpea-journal")
-(declare-function vulpea-vui-journal-dates-in-month "vulpea-journal")
+(declare-function vulpea-journal-dates-in-month "vulpea-journal")
 (declare-function vulpea-journal--date-from-note "vulpea-journal")
 
 (defvar vulpea-journal-widgets-buffer-name)
@@ -183,6 +183,53 @@ Example:
           (const :tag "Monday" 1))
   :group 'vulpea-journal-ui)
 
+(defun vulpea-journal-ui--calendar-build-rows (month year current-day entry-days today-day today-month today-year set-date)
+  "Build calendar rows for MONTH/YEAR.
+CURRENT-DAY is the selected day.
+ENTRY-DAYS is list of days with journal entries.
+TODAY-DAY/TODAY-MONTH/TODAY-YEAR identify today.
+SET-DATE is callback to change date."
+  (let* ((first-day-of-month (encode-time 0 0 0 1 month year))
+         (first-dow (decoded-time-weekday (decode-time first-day-of-month)))
+         (first-dow-adjusted (mod (- first-dow vulpea-journal-ui-calendar-week-start) 7))
+         (days-in-month (calendar-last-day-of-month month year))
+         (day 1)
+         (rows nil))
+    ;; Build weeks
+    (while (<= day days-in-month)
+      (let ((week nil))
+        ;; Padding for first week
+        (when (and (= day 1) (> first-dow-adjusted 0))
+          (dotimes (_ first-dow-adjusted)
+            (push "" week)))
+        ;; Days in this week
+        (while (and (<= day days-in-month) (< (length week) 7))
+          (let* ((d day)
+                 (is-today (and (= d today-day)
+                                (= month today-month)
+                                (= year today-year)))
+                 (is-selected (= d current-day))
+                 (has-entry (member d entry-days))
+                 (face (cond
+                        (is-today 'vulpea-journal-ui-calendar-today)
+                        (has-entry 'vulpea-journal-ui-calendar-entry)
+                        (t nil)))
+                 (day-text (format "%2d" d)))
+            (push (vui-button (if is-selected
+                                  (format "[%s]" day-text)
+                                (format " %s " day-text))
+                    :face face
+                    :on-click (lambda ()
+                                (funcall set-date
+                                         (encode-time 0 0 0 d month year))))
+                  week))
+          (setq day (1+ day)))
+        ;; Pad end of last week
+        (while (< (length week) 7)
+          (push "" week))
+        (push (nreverse week) rows)))
+    (nreverse rows)))
+
 (defcomponent vui-journal-calendar ()
   :render
   (let* ((date (use-vui-journal-date))
@@ -194,23 +241,30 @@ Example:
          ;; Get days with entries
          (entry-days (mapcar (lambda (d)
                                (decoded-time-day (decode-time d)))
-                             (vulpea-vui-journal-dates-in-month month year)))
+                             (vulpea-journal-dates-in-month month year)))
          ;; Today info
          (today (decode-time))
          (today-day (decoded-time-day today))
          (today-month (decoded-time-month today))
          (today-year (decoded-time-year today))
-         ;; Calendar calculation
-         (first-day-of-month (encode-time 0 0 0 1 month year))
-         (first-dow (decoded-time-weekday (decode-time first-day-of-month)))
-         (first-dow-adjusted (mod (- first-dow vulpea-journal-ui-calendar-week-start) 7))
-         (days-in-month (calendar-last-day-of-month month year))
+         ;; Day name headers
+         (day-names (if (= vulpea-journal-ui-calendar-week-start 1)
+                        '("Mo" "Tu" "We" "Th" "Fr" "Sa" "Su")
+                      '("Su" "Mo" "Tu" "We" "Th" "Fr" "Sa")))
+         ;; Column specs
+         (columns (mapcar (lambda (name)
+                            (list :header name :width 4 :align :center))
+                          day-names))
+         ;; Build rows
+         (rows (vulpea-journal-ui--calendar-build-rows
+                month year current-day entry-days
+                today-day today-month today-year set-date))
          (month-name (calendar-month-name month)))
     (vui-vstack
-     ;; Widget title with collapse toggle (could add later)
+     ;; Widget title
      (vui-text "Calendar" :face 'vulpea-journal-ui-widget-title)
      (vui-newline)
-     ;; Month/year header
+     ;; Month/year header with navigation
      (vui-hstack
       :spacing 1
       (vui-button "<"
@@ -229,57 +283,10 @@ Example:
                                           (if (= month 12) 1 (1+ month))
                                           (if (= month 12) (1+ year) year))))))
      (vui-newline)
-     ;; Day headers
-     (let ((day-names (if (= vulpea-journal-ui-calendar-week-start 1)
-                          '("Mo" "Tu" "We" "Th" "Fr" "Sa" "Su")
-                        '("Su" "Mo" "Tu" "We" "Th" "Fr" "Sa"))))
-       (apply #'vui-hstack :spacing 1
-              (mapcar (lambda (d)
-                        (vui-box (vui-text d :face 'shadow)
-                          :width 3 :align :center))
-                      day-names)))
-     ;; Calendar grid
-     (vui-fragment
-      (let ((day 1)
-            (rows nil))
-        ;; Build weeks
-        (while (<= day days-in-month)
-          (let ((week-cells nil))
-            ;; Initial padding for first week
-            (when (and (= day 1) (> first-dow-adjusted 0))
-              (dotimes (_ first-dow-adjusted)
-                (push (vui-box (vui-text " ") :width 3 :align :center) week-cells)))
-            ;; Days in this week
-            (while (and (<= day days-in-month)
-                        (or (null week-cells)
-                            (< (+ (length week-cells)
-                                  (if (= day 1) 0 0))
-                               7)))
-              (let* ((d day)
-                     (is-today (and (= d today-day)
-                                    (= month today-month)
-                                    (= year today-year)))
-                     (is-selected (= d current-day))
-                     (has-entry (member d entry-days))
-                     (face (cond
-                            (is-today 'vulpea-journal-ui-calendar-today)
-                            (has-entry 'vulpea-journal-ui-calendar-entry)
-                            (t nil)))
-                     (day-text (format "%2d" d)))
-                (push (vui-button (if is-selected
-                                      (format "[%s]" day-text)
-                                    (format " %s " day-text))
-                        :face face
-                        :on-click (lambda ()
-                                    (funcall set-date
-                                             (encode-time 0 0 0 d month year))))
-                      week-cells))
-              (setq day (1+ day)))
-            ;; Pad end of last week
-            (while (< (length week-cells) 7)
-              (push (vui-box (vui-text " ") :width 3 :align :center) week-cells))
-            (push (apply #'vui-hstack :spacing 1 (nreverse week-cells)) rows)))
-        (apply #'vui-vstack (nreverse rows)))))))
+     ;; Calendar table
+     (vui-table
+      :columns columns
+      :rows rows))))
 
 ;;; Created Today Widget
 
