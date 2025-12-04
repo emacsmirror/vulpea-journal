@@ -438,6 +438,11 @@ SET-SELECTED-DATE is callback to change selected date."
   :type 'boolean
   :group 'vulpea-journal-ui)
 
+(defcustom vulpea-journal-ui-previous-years-expanded t
+  "If non-nil, show previews expanded by default."
+  :type 'boolean
+  :group 'vulpea-journal-ui)
+
 (defun vulpea-journal-ui--strip-drawers (text)
   "Remove org drawers from TEXT."
   (with-temp-buffer
@@ -492,7 +497,7 @@ SET-SELECTED-DATE is callback to change selected date."
             (string-trim (buffer-substring-no-properties start end))))))))
 
 (defcomponent vui-journal-previous-year-entry (entry)
-  :state ((expanded nil))
+  :state ((expanded vulpea-journal-ui-previous-years-expanded))
 
   :render
   (let* ((date (plist-get entry :date))
