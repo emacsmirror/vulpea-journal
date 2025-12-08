@@ -418,7 +418,7 @@ ON-SELECT is callback to handle date selection."
                                :face 'link
                                :on-click visit-note)
                              (when tags
-                               (vui-text (->> tags (--map (concat "#" it)) (string-join " "))
+                               (vui-text (string-join (--map (concat "#" it) tags) " ")
                                  :face 'shadow)))))
                         #'vulpea-note-id))))))))
 
