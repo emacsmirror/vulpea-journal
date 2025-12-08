@@ -73,6 +73,20 @@
   "UI widgets for vulpea-journal."
   :group 'vulpea-journal)
 
+(defcustom vulpea-journal-ui-debug nil
+  "Enable debug logging for vulpea-journal-ui.
+When non-nil, logs to *vulpea-journal-debug* buffer."
+  :type 'boolean
+  :group 'vulpea-journal-ui)
+
+(defun vulpea-journal-ui--debug (format-string &rest args)
+  "Log debug message using FORMAT-STRING and ARGS.
+Only logs when `vulpea-journal-ui-debug' is non-nil."
+  (when vulpea-journal-ui-debug
+    (with-current-buffer (get-buffer-create "*vulpea-journal-debug*")
+      (goto-char (point-max))
+      (insert (apply #'format format-string args) "\n"))))
+
 (defcustom vulpea-journal-ui-calendar-week-start 1
   "Day to start week on. 0 = Sunday, 1 = Monday."
   :type '(choice (const :tag "Sunday" 0)
@@ -250,6 +264,12 @@ ON-SELECT is callback to handle date selection."
                           (has-entry 'vulpea-journal-ui-calendar-entry)
                           (t 'vulpea-journal-ui-calendar-date)))
                    (day-text (format "%2d" d)))
+              ;; Debug first 10 days
+              (when (<= d 10)
+                (vulpea-journal-ui--debug "Day %d: date=%s has-entry=%s"
+                                          d
+                                          (format-time-string "%Y-%m-%d %H:%M:%S" date)
+                                          has-entry))
               (vui-button (format
                            (cond
                             (is-selected " %s ")
@@ -287,7 +307,15 @@ ON-SELECT is callback to handle date selection."
              (display-year (or view-year selected-year))
              ;; Get days with entries (memoized)
              (entry-days (use-memo (display-month display-year)
-                           (vulpea-journal-dates-in-month display-month display-year)))
+                           (let ((days (vulpea-journal-dates-in-month display-month display-year)))
+                             (vulpea-journal-ui--debug "=== Calendar Debug ===")
+                             (vulpea-journal-ui--debug "Querying month=%d year=%d" display-month display-year)
+                             (vulpea-journal-ui--debug "Found %d entry days" (length days))
+                             (dolist (d days)
+                               (vulpea-journal-ui--debug "  Entry day: %s (type: %s)"
+                                                         (format-time-string "%Y-%m-%d" d)
+                                                         (type-of d)))
+                             days)))
              ;; Today (actual current date)
              (today (decode-time))
              (today-day (decoded-time-day today))
