@@ -4,8 +4,8 @@
 ;;
 ;; Author: Boris Buliga <boris@d12frosted.io>
 ;; Maintainer: Boris Buliga <boris@d12frosted.io>
-;; Version: 0.1.0
-;; Package-Requires: ((emacs "29.1") (vulpea "2.0.0") (vui "0.1.0"))
+;; Version: 0.2.0
+;; Package-Requires: ((emacs "29.1") (vulpea "2.0.0") (vulpea-ui "0.1.0") (dash "2.20.0"))
 ;; Keywords: org-mode, roam, convenience
 ;; URL: https://github.com/d12frosted/vulpea-journal
 ;;
@@ -32,18 +32,20 @@
 ;;; Commentary:
 ;;
 ;; vulpea-journal provides a day-centric interface for daily note
-;; workflows. It creates a focused workspace with today's journal
-;; note and contextual widgets powered by vui.el.
+;; workflows. It integrates with vulpea-ui's sidebar to show
+;; journal-specific widgets when viewing journal notes.
 ;;
 ;; Main features:
 ;; - Daily note identification and navigation
-;; - Two-window layout: org buffer + widgets buffer
-;; - Reactive widget system using vui.el
-;; - Calendar integration
+;; - Integration with vulpea-ui sidebar
+;; - Calendar widget with entry indicators
+;; - Previous years view
+;; - Emacs calendar integration
 ;;
 ;; Quick start:
 ;;
 ;;   (require 'vulpea-journal)
+;;   (vulpea-journal-setup)
 ;;   (global-set-key (kbd "C-c j") #'vulpea-journal)
 ;;
 ;;; Code:
@@ -51,10 +53,12 @@
 (require 'vulpea)
 (require 'vulpea-db)
 (require 'vulpea-db-query)
-(require 'vui)
+(require 'vulpea-ui)
+(require 'dash)
 (require 'calendar)
 
 (defvar vulpea-directory)
+
 
 ;;; Customization
 
@@ -65,7 +69,8 @@
 (defcustom vulpea-journal-default-template
   '(:file-name "journal/%Y-%m-%d.org"
     :title "%Y-%m-%d %A"
-    :tags ("journal"))
+    :tags ("journal")
+    :head "#+created: %<[%Y-%m-%d]>")
   "Default template for journal notes.
 
 Can be a plist or a function taking DATE and returning a plist.
@@ -88,7 +93,7 @@ Note on template syntax:
   `:file-name' and `:title' use strftime format (e.g., %Y-%m-%d)
   because they must be expanded for the TARGET DATE, not current
   time. When you open journal for Nov 25, the file should be
-  20241125.org regardless of today's date.
+  journal/2024-11-25.org regardless of today's date.
 
   Other keys (`:head', `:body', etc.) use vulpea's %<format> syntax
   and are expanded by `vulpea-create' at note creation time.
@@ -113,16 +118,6 @@ Or as a function for dynamic configuration:
           function)
   :group 'vulpea-journal)
 
-(defcustom vulpea-journal-window-ratio 0.5
-  "Ratio of window width for the daily note buffer.
-The widgets buffer takes the remaining space."
-  :type 'float
-  :group 'vulpea-journal)
-
-(defcustom vulpea-journal-widgets-buffer-name "*vulpea-journal*"
-  "Name for the journal widgets buffer."
-  :type 'string
-  :group 'vulpea-journal)
 
 ;;; Template Resolution
 
@@ -138,16 +133,6 @@ Uses current time for template resolution."
   (or (car (plist-get (vulpea-journal--get-template (current-time)) :tags))
       "journal"))
 
-;;; Variables
-
-(defvar-local vulpea-journal--current-date nil
-  "Current date displayed in journal view.")
-
-(defvar-local vulpea-journal--note-buffer nil
-  "Associated note buffer for widgets buffer.")
-
-(defvar-local vulpea-journal--widgets-buffer nil
-  "Associated widgets buffer for note buffer.")
 
 ;;; Journal Directory
 
@@ -158,12 +143,32 @@ Uses current time for template resolution."
       (make-directory dir t))
     dir))
 
+
 ;;; Note Identification
 
 (defun vulpea-journal-note-p (note)
   "Return non-nil if NOTE is a journal note."
   (and note
        (member (vulpea-journal--get-tag) (vulpea-note-tags note))))
+
+(defun vulpea-journal-note-date (note)
+  "Extract date from journal NOTE.
+Returns time value or nil if not a journal note or date cannot be extracted.
+
+Extracts date from the CREATED property in the note's property drawer.
+Supports formats like [2025-12-08], [2025-12-08 08:54], or 2025-12-08."
+  (when (vulpea-journal-note-p note)
+    (when-let* ((props (vulpea-note-properties note))
+                (created (cdr (assoc "CREATED" props))))
+      ;; Parse date from CREATED property
+      (when (string-match "\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)" created)
+        (let ((year (string-to-number (match-string 1 created)))
+              (month (string-to-number (match-string 2 created)))
+              (day (string-to-number (match-string 3 created))))
+          (encode-time 0 0 0 day month year))))))
+
+
+;;; File Path Resolution
 
 (defun vulpea-journal--file-for-date (date)
   "Return file path for journal note on DATE."
@@ -179,18 +184,16 @@ Uses current time for template resolution."
          (title-fmt (plist-get tpl :title)))
     (format-time-string title-fmt date)))
 
-(defun vulpea-journal--date-from-note (note)
-  "Extract date from journal NOTE.
-Returns time value or nil if not a journal note."
-  (when (vulpea-journal-note-p note)
-    (let* ((path (vulpea-note-path note))
-           (filename (file-name-nondirectory path)))
-      ;; Try to parse date from filename
-      (when (string-match "\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)" filename)
-        (let ((year (string-to-number (match-string 1 filename)))
-              (month (string-to-number (match-string 2 filename)))
-              (day (string-to-number (match-string 3 filename))))
-          (encode-time 0 0 0 day month year))))))
+(defun vulpea-journal--date-from-file (file)
+  "Extract date from journal FILE path.
+Returns time value or nil if date cannot be extracted."
+  (let ((filename (file-name-nondirectory file)))
+    (when (string-match "\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)" filename)
+      (let ((year (string-to-number (match-string 1 filename)))
+            (month (string-to-number (match-string 2 filename)))
+            (day (string-to-number (match-string 3 filename))))
+        (encode-time 0 0 0 day month year)))))
+
 
 ;;; Note Lookup
 
@@ -202,10 +205,6 @@ Returns time value or nil if not a journal note."
             (lambda (note)
               (and (string= (vulpea-note-path note) file)
                    (= (vulpea-note-level note) 0))))))))
-
-(defun vulpea-journal-today-note ()
-  "Get today's journal note, creating if needed."
-  (vulpea-journal-note (current-time)))
 
 (defun vulpea-journal-note (date)
   "Get journal note for DATE, creating if needed."
@@ -232,18 +231,23 @@ Returns time value or nil if not a journal note."
     ;; Return the created note
     (vulpea-db-get-by-id id)))
 
+
 ;;; Date Queries
+
+(defun vulpea-journal-all-dates ()
+  "Return list of all dates with journal entries."
+  (->> (list (vulpea-journal--get-tag))
+       (vulpea-db-query-by-tags-every)
+       (--filter (= (vulpea-note-level it) 0))
+       (-map #'vulpea-journal-note-date)
+       (-filter #'identity)
+       (-sort #'time-less-p)))
 
 (defun vulpea-journal-dates-in-range (start end)
   "Return list of dates with journal entries between [START, END)."
-  (->> (list (vulpea-journal--get-tag))
-       (vulpea-db-query-by-tags-every)
-       (--filter (when-let ((date (vulpea-journal--date-from-note it)))
-                   (and (or (time-equal-p start date) (time-less-p start date))
-                        (time-less-p date end)
-                        date)))
-       (-map #'vulpea-journal--date-from-note)
-       (-filter #'identity)))
+  (->> (vulpea-journal-all-dates)
+       (--filter (and (or (time-equal-p start it) (time-less-p start it))
+                      (time-less-p it end)))))
 
 (defun vulpea-journal-dates-in-month (month year)
   "Return list of dates with journal entries in MONTH of YEAR."
@@ -252,65 +256,61 @@ Returns time value or nil if not a journal note."
                           (if (= month 12) (1+ year) year))))
     (vulpea-journal-dates-in-range start end)))
 
-(defun vulpea-journal-all-dates ()
-  "Return list of all dates with journal entries."
-  (->> (list (vulpea-journal--get-tag))
-       (vulpea-db-query-by-tags-every)
-       (-map #'vulpea-journal--date-from-note)
-       (-filter #'identity)))
+(defun vulpea-journal-notes-for-date-across-years (date &optional years-back)
+  "Return journal notes for same day as DATE in previous years.
+YEARS-BACK specifies how many years to look back (default 5)."
+  (let* ((decoded (decode-time date))
+         (month (decoded-time-month decoded))
+         (day (decoded-time-day decoded))
+         (year (decoded-time-year decoded))
+         (years-back (or years-back 5)))
+    (->> (-iota years-back 1)
+         (--map (let* ((past-year (- year it))
+                       (check-date (encode-time 0 0 0 day month past-year)))
+                  (when-let ((note (vulpea-journal-find-note check-date)))
+                    (list :date check-date
+                          :years-ago it
+                          :note note))))
+         (-non-nil))))
 
-;;; Two-Window Layout
 
-(defun vulpea-journal--get-note-buffer (note)
-  "Get or create buffer for NOTE."
-  (find-file-noselect (vulpea-note-path note)))
+;;; Navigation
 
-(defun vulpea-journal--setup-windows (note-buffer widgets-buffer)
-  "Set up two-window layout with NOTE-BUFFER and WIDGETS-BUFFER."
-  (delete-other-windows)
-  (switch-to-buffer note-buffer)
-  (let* ((total-width (window-total-width))
-         (note-width (floor (* total-width vulpea-journal-window-ratio)))
-         (widgets-window (split-window-right note-width)))
-    (set-window-buffer widgets-window widgets-buffer)
-    ;; Return to note buffer
-    (select-window (get-buffer-window note-buffer))))
+(defun vulpea-journal--adjacent-date (date direction)
+  "Find adjacent journal entry date from DATE in DIRECTION.
+DIRECTION is either `next' or `prev'.
+Returns the date of the adjacent entry, or nil if none."
+  (let ((all-dates (vulpea-journal-all-dates)))
+    (pcase direction
+      ('next
+       (--first (time-less-p date it) all-dates))
+      ('prev
+       (--last (time-less-p it date) all-dates)))))
+
 
 ;;; Interactive Commands
 
 ;;;###autoload
 (defun vulpea-journal (&optional date)
-  "Open journal view for DATE (defaults to today).
-Creates a two-window layout with the journal note on the left
-and interactive widgets on the right."
+  "Open journal note for DATE (defaults to today).
+Opens the note and shows vulpea-ui sidebar with journal widgets."
   (interactive)
-  (require 'vulpea-journal-ui)
   (let* ((date (or date (current-time)))
-         (note (vulpea-journal-note date))
-         (note-buffer (vulpea-journal--get-note-buffer note)))
-    ;; Mount vui widgets
-    (vui-mount (vui-component 'vui-journal-root :initial-date date)
-               vulpea-journal-widgets-buffer-name)
-    (let ((widgets-buffer (get-buffer vulpea-journal-widgets-buffer-name)))
-      ;; Link buffers
-      (with-current-buffer note-buffer
-        (setq-local vulpea-journal--widgets-buffer widgets-buffer)
-        (setq-local vulpea-journal--current-date date))
-      (with-current-buffer widgets-buffer
-        (setq-local vulpea-journal--note-buffer note-buffer)
-        (setq-local vulpea-journal--current-date date))
-      ;; Set up windows
-      (vulpea-journal--setup-windows note-buffer widgets-buffer))))
+         (note (vulpea-journal-note date)))
+    (vulpea-visit note)
+    ;; Ensure sidebar is open
+    (unless (vulpea-ui--sidebar-visible-p)
+      (vulpea-ui-sidebar-open))))
 
 ;;;###autoload
 (defun vulpea-journal-today ()
-  "Open journal view for today."
+  "Open journal for today."
   (interactive)
   (vulpea-journal (current-time)))
 
 ;;;###autoload
 (defun vulpea-journal-date (date)
-  "Open journal view for DATE.
+  "Open journal for DATE.
 When called interactively, prompt for date."
   (interactive (list (vulpea-journal--read-date "Journal date: ")))
   (vulpea-journal date))
@@ -321,21 +321,30 @@ When called interactively, prompt for date."
          (date-string (org-read-date nil nil nil prompt)))
     (org-time-string-to-time date-string)))
 
-;;; Navigation Commands
-
-(defun vulpea-journal-quit ()
-  "Quit journal view and restore window configuration."
+;;;###autoload
+(defun vulpea-journal-next ()
+  "Navigate to the next journal entry."
   (interactive)
-  (when-let ((widgets-buffer (get-buffer vulpea-journal-widgets-buffer-name)))
-    (when-let ((window (get-buffer-window widgets-buffer)))
-      (delete-window window))
-    (kill-buffer widgets-buffer)))
+  (let ((note (vulpea-ui-current-note)))
+    (if (not (vulpea-journal-note-p note))
+        (user-error "Not viewing a journal note")
+      (if-let* ((current-date (vulpea-journal-note-date note))
+                (next-date (vulpea-journal--adjacent-date current-date 'next)))
+          (vulpea-journal next-date)
+        (message "No next journal entry")))))
 
-(defun vulpea-journal-edit-note ()
-  "Switch to the note buffer for editing."
+;;;###autoload
+(defun vulpea-journal-previous ()
+  "Navigate to the previous journal entry."
   (interactive)
-  (when vulpea-journal--note-buffer
-    (select-window (get-buffer-window vulpea-journal--note-buffer))))
+  (let ((note (vulpea-ui-current-note)))
+    (if (not (vulpea-journal-note-p note))
+        (user-error "Not viewing a journal note")
+      (if-let* ((current-date (vulpea-journal-note-date note))
+                (prev-date (vulpea-journal--adjacent-date current-date 'prev)))
+          (vulpea-journal prev-date)
+        (message "No previous journal entry")))))
+
 
 ;;; Calendar Integration
 
@@ -368,15 +377,53 @@ When called interactively, prompt for date."
                                    (nth 0 date)   ; month
                                    (nth 2 date))))))
 
+(defun vulpea-journal-calendar-next ()
+  "Move to next journal entry in calendar."
+  (interactive)
+  (let* ((date (calendar-cursor-to-date t))
+         (time (when date
+                 (encode-time 0 0 0 (nth 1 date) (nth 0 date) (nth 2 date))))
+         (next-date (when time
+                      (vulpea-journal--adjacent-date time 'next))))
+    (if next-date
+        (let ((decoded (decode-time next-date)))
+          (calendar-goto-date (list (decoded-time-month decoded)
+                                    (decoded-time-day decoded)
+                                    (decoded-time-year decoded))))
+      (message "No next journal entry"))))
+
+(defun vulpea-journal-calendar-previous ()
+  "Move to previous journal entry in calendar."
+  (interactive)
+  (let* ((date (calendar-cursor-to-date t))
+         (time (when date
+                 (encode-time 0 0 0 (nth 1 date) (nth 0 date) (nth 2 date))))
+         (prev-date (when time
+                      (vulpea-journal--adjacent-date time 'prev))))
+    (if prev-date
+        (let ((decoded (decode-time prev-date)))
+          (calendar-goto-date (list (decoded-time-month decoded)
+                                    (decoded-time-day decoded)
+                                    (decoded-time-year decoded))))
+      (message "No previous journal entry"))))
+
+
+;;; Setup
+
 ;;;###autoload
-(defun vulpea-journal-calendar-setup ()
-  "Set up calendar integration for vulpea-journal.
-Call this in your init file to enable calendar marks and keybindings."
+(defun vulpea-journal-setup ()
+  "Set up vulpea-journal integration.
+This enables calendar marks and keybindings."
+  ;; Calendar hooks
   (add-hook 'calendar-today-visible-hook #'vulpea-journal-calendar-mark-entries)
   (add-hook 'calendar-today-invisible-hook #'vulpea-journal-calendar-mark-entries)
-  ;; Add keybindings to calendar mode
+  ;; Calendar keybindings
   (with-eval-after-load 'calendar
-    (define-key calendar-mode-map (kbd "j") #'vulpea-journal-calendar-open)))
+    (define-key calendar-mode-map (kbd "j") #'vulpea-journal-calendar-open)
+    (define-key calendar-mode-map (kbd "]") #'vulpea-journal-calendar-next)
+    (define-key calendar-mode-map (kbd "[") #'vulpea-journal-calendar-previous))
+  ;; Load UI module for sidebar widgets
+  (require 'vulpea-journal-ui))
 
 (provide 'vulpea-journal)
 ;;; vulpea-journal.el ends here
