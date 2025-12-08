@@ -150,6 +150,14 @@ This is the date of the journal entry you are currently viewing."
 
 ;;; Helper Functions
 
+(defun vulpea-journal-ui--visit-date (date)
+  "Visit journal for DATE from sidebar context.
+Opens the note in the main window, not the sidebar."
+  (require 'vulpea-journal)
+  (let ((note (vulpea-journal-note date)))
+    ;; Use other-window to open in main content window
+    (vulpea-visit note t)))
+
 (defun vulpea-journal-ui--strip-drawers (text)
   "Remove org drawers from TEXT."
   (with-temp-buffer
@@ -212,14 +220,11 @@ This is the date of the journal entry you are currently viewing."
     (when (vulpea-journal-note-p note)
       (let* ((date (vulpea-journal-note-date note))
              (go-prev (lambda ()
-                        (require 'vulpea-journal)
-                        (vulpea-journal (time-subtract date (days-to-time 1)))))
+                        (vulpea-journal-ui--visit-date (time-subtract date (days-to-time 1)))))
              (go-today (lambda ()
-                         (require 'vulpea-journal)
-                         (vulpea-journal (current-time))))
+                         (vulpea-journal-ui--visit-date (current-time))))
              (go-next (lambda ()
-                        (require 'vulpea-journal)
-                        (vulpea-journal (time-add date (days-to-time 1))))))
+                        (vulpea-journal-ui--visit-date (time-add date (days-to-time 1))))))
         (vui-vstack
          ;; Header with date
          (vui-text (format-time-string "Journal: %Y-%m-%d %A" date)
@@ -325,8 +330,7 @@ ON-SELECT is callback to handle date selection."
              (columns (--map (list :header it :width 5) day-names))
              ;; Date selection handler
              (on-select (lambda (new-date)
-                          (require 'vulpea-journal)
-                          (vulpea-journal new-date)))
+                          (vulpea-journal-ui--visit-date new-date)))
              ;; Build rows
              (rows (vulpea-journal-ui--calendar-build-rows
                     display-month display-year
