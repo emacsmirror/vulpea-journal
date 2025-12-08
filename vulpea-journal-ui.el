@@ -243,7 +243,7 @@ ON-SELECT is callback to handle date selection."
                    (is-selected (and (= d selected-day)
                                      (= month selected-month)
                                      (= year selected-year)))
-                   (has-entry (-contains-p entry-days date))
+                   (has-entry (--any-p (time-equal-p it date) entry-days))
                    (face (cond
                           (is-selected 'vulpea-journal-ui-calendar-selected)
                           (is-today 'vulpea-journal-ui-calendar-today)
