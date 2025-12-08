@@ -154,9 +154,11 @@ This is the date of the journal entry you are currently viewing."
   "Visit journal for DATE from sidebar context.
 Opens the note in the main window, not the sidebar."
   (require 'vulpea-journal)
-  (let ((note (vulpea-journal-note date)))
-    ;; Use other-window to open in main content window
-    (vulpea-visit note t)))
+  (let ((note (vulpea-journal-note date))
+        (main-win (vulpea-ui--get-main-window)))
+    (when main-win
+      (select-window main-win))
+    (vulpea-visit note)))
 
 (defun vulpea-journal-ui--strip-drawers (text)
   "Remove org drawers from TEXT."
