@@ -168,22 +168,26 @@ Uses current time for template resolution."
   "Extract date from journal NOTE.
 Returns time value or nil if not a journal note or date cannot be extracted.
 
-Extracts date from the CREATED property in the note's property drawer.
-Supports formats like [2025-12-08], [2025-12-08 08:54], or 2025-12-08."
+Extracts date from the file path (e.g., journal/2025-12-08.org).
+Falls back to CREATED property if file path doesn't contain a date."
   (when (vulpea-journal-note-p note)
-    (let* ((props (vulpea-note-properties note))
-           (created (cdr (assoc "CREATED" props))))
-      (vulpea-journal--debug "note-date: title=%s props=%S created=%S"
+    (let ((path (vulpea-note-path note)))
+      (vulpea-journal--debug "note-date: title=%s path=%s"
                              (vulpea-note-title note)
-                             props
-                             created)
-      (when created
-        ;; Parse date from CREATED property
-        (when (string-match "\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)" created)
-          (let ((year (string-to-number (match-string 1 created)))
-                (month (string-to-number (match-string 2 created)))
-                (day (string-to-number (match-string 3 created))))
-            (encode-time 0 0 0 day month year)))))))
+                             path)
+      ;; Extract date from file path first (most reliable)
+      (or (vulpea-journal--date-from-file path)
+          ;; Fall back to CREATED property
+          (let* ((props (vulpea-note-properties note))
+                 (created (cdr (assoc "CREATED" props))))
+            (vulpea-journal--debug "note-date: fallback to props=%S created=%S"
+                                   props created)
+            (when (and created
+                       (string-match "\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)" created))
+              (let ((year (string-to-number (match-string 1 created)))
+                    (month (string-to-number (match-string 2 created)))
+                    (day (string-to-number (match-string 3 created))))
+                (encode-time 0 0 0 day month year))))))))
 
 
 ;;; File Path Resolution
