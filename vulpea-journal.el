@@ -144,6 +144,19 @@ Uses current time for template resolution."
     dir))
 
 
+;;; Debug
+
+(defvar vulpea-journal-debug nil
+  "Enable debug logging for vulpea-journal.")
+
+(defun vulpea-journal--debug (format-string &rest args)
+  "Log debug message using FORMAT-STRING and ARGS."
+  (when vulpea-journal-debug
+    (with-current-buffer (get-buffer-create "*vulpea-journal-debug*")
+      (goto-char (point-max))
+      (insert (apply #'format format-string args) "\n"))))
+
+
 ;;; Note Identification
 
 (defun vulpea-journal-note-p (note)
@@ -158,14 +171,19 @@ Returns time value or nil if not a journal note or date cannot be extracted.
 Extracts date from the CREATED property in the note's property drawer.
 Supports formats like [2025-12-08], [2025-12-08 08:54], or 2025-12-08."
   (when (vulpea-journal-note-p note)
-    (when-let* ((props (vulpea-note-properties note))
-                (created (cdr (assoc "CREATED" props))))
-      ;; Parse date from CREATED property
-      (when (string-match "\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)" created)
-        (let ((year (string-to-number (match-string 1 created)))
-              (month (string-to-number (match-string 2 created)))
-              (day (string-to-number (match-string 3 created))))
-          (encode-time 0 0 0 day month year))))))
+    (let* ((props (vulpea-note-properties note))
+           (created (cdr (assoc "CREATED" props))))
+      (vulpea-journal--debug "note-date: title=%s props=%S created=%S"
+                             (vulpea-note-title note)
+                             props
+                             created)
+      (when created
+        ;; Parse date from CREATED property
+        (when (string-match "\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)" created)
+          (let ((year (string-to-number (match-string 1 created)))
+                (month (string-to-number (match-string 2 created)))
+                (day (string-to-number (match-string 3 created))))
+            (encode-time 0 0 0 day month year)))))))
 
 
 ;;; File Path Resolution
@@ -236,12 +254,17 @@ Returns time value or nil if date cannot be extracted."
 
 (defun vulpea-journal-all-dates ()
   "Return list of all dates with journal entries."
-  (->> (list (vulpea-journal--get-tag))
-       (vulpea-db-query-by-tags-every)
-       (--filter (= (vulpea-note-level it) 0))
-       (-map #'vulpea-journal-note-date)
-       (-filter #'identity)
-       (-sort #'time-less-p)))
+  (let* ((tag (vulpea-journal--get-tag))
+         (notes (vulpea-db-query-by-tags-every (list tag)))
+         (file-level-notes (--filter (= (vulpea-note-level it) 0) notes)))
+    (vulpea-journal--debug "=== all-dates ===")
+    (vulpea-journal--debug "Tag: %s" tag)
+    (vulpea-journal--debug "Notes with tag: %d" (length notes))
+    (vulpea-journal--debug "File-level notes: %d" (length file-level-notes))
+    (->> file-level-notes
+         (-map #'vulpea-journal-note-date)
+         (-filter #'identity)
+         (-sort #'time-less-p))))
 
 (defun vulpea-journal-dates-in-range (start end)
   "Return list of dates with journal entries between [START, END)."

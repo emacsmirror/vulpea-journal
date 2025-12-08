@@ -73,16 +73,12 @@
   "UI widgets for vulpea-journal."
   :group 'vulpea-journal)
 
-(defcustom vulpea-journal-ui-debug nil
-  "Enable debug logging for vulpea-journal-ui.
-When non-nil, logs to *vulpea-journal-debug* buffer."
-  :type 'boolean
-  :group 'vulpea-journal-ui)
+(defvar vulpea-journal-debug)
 
 (defun vulpea-journal-ui--debug (format-string &rest args)
   "Log debug message using FORMAT-STRING and ARGS.
-Only logs when `vulpea-journal-ui-debug' is non-nil."
-  (when vulpea-journal-ui-debug
+Only logs when `vulpea-journal-debug' is non-nil."
+  (when (bound-and-true-p vulpea-journal-debug)
     (with-current-buffer (get-buffer-create "*vulpea-journal-debug*")
       (goto-char (point-max))
       (insert (apply #'format format-string args) "\n"))))
