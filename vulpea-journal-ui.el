@@ -326,78 +326,78 @@ ON-SELECT is callback to handle date selection."
   :render
   (let* ((note (use-vulpea-ui-note))
          (date (vulpea-journal-note-date note))
-             (decoded (decode-time date))
-             (selected-day (decoded-time-day decoded))
-             (selected-month (decoded-time-month decoded))
-             (selected-year (decoded-time-year decoded))
-             ;; Use view-month/year if set, otherwise use selected date's month
-             (display-month (or view-month selected-month))
-             (display-year (or view-year selected-year))
-             ;; Get days with entries (memoized)
-             (entry-days (use-memo (display-month display-year)
-                           (let ((days (vulpea-journal-dates-in-month display-month display-year)))
-                             (vulpea-journal-ui--debug "=== Calendar Debug ===")
-                             (vulpea-journal-ui--debug "Querying month=%d year=%d" display-month display-year)
-                             (vulpea-journal-ui--debug "Found %d entry days" (length days))
-                             (dolist (d days)
-                               (vulpea-journal-ui--debug "  Entry day: %s (type: %s)"
-                                                         (format-time-string "%Y-%m-%d" d)
-                                                         (type-of d)))
-                             days)))
-             ;; Today (actual current date)
-             (today (decode-time))
-             (today-day (decoded-time-day today))
-             (today-month (decoded-time-month today))
-             (today-year (decoded-time-year today))
-             ;; Day name headers
-             (day-names (if (= vulpea-journal-ui-calendar-week-start 1)
-                            '("Mo" "Tu" "We" "Th" "Fr" "Sa" "Su")
-                          '("Su" "Mo" "Tu" "We" "Th" "Fr" "Sa")))
-             ;; Column specs
-             (columns (--map (list :header it :width 5) day-names))
-             ;; Date selection handler
-             (on-select (lambda (new-date)
-                          (vulpea-journal-ui--visit-date new-date)))
-             ;; Build rows
-             (rows (vulpea-journal-ui--calendar-build-rows
-                    display-month display-year
-                    selected-day selected-month selected-year
-                    entry-days
-                    today-day today-month today-year on-select))
-             (month-name (calendar-month-name display-month))
-             ;; Navigation callbacks
-             (go-prev-month (lambda ()
-                              (vui-batch
-                               (vui-set-state :view-month (if (= display-month 1) 12 (1- display-month)))
-                               (vui-set-state :view-year (if (= display-month 1) (1- display-year) display-year)))))
-             (go-next-month (lambda ()
-                              (vui-batch
-                               (vui-set-state :view-month (if (= display-month 12) 1 (1+ display-month)))
-                               (vui-set-state :view-year (if (= display-month 12) (1+ display-year) display-year))))))
-        ;; Reset view-month/year when selected date changes to different month
-        (use-effect (selected-month selected-year)
-          (vui-batch
-           (vui-set-state :view-month nil)
-           (vui-set-state :view-year nil)))
+         (decoded (decode-time date))
+         (selected-day (decoded-time-day decoded))
+         (selected-month (decoded-time-month decoded))
+         (selected-year (decoded-time-year decoded))
+         ;; Use view-month/year if set, otherwise use selected date's month
+         (display-month (or view-month selected-month))
+         (display-year (or view-year selected-year))
+         ;; Get days with entries (memoized)
+         (entry-days (use-memo (display-month display-year)
+                       (let ((days (vulpea-journal-dates-in-month display-month display-year)))
+                         (vulpea-journal-ui--debug "=== Calendar Debug ===")
+                         (vulpea-journal-ui--debug "Querying month=%d year=%d" display-month display-year)
+                         (vulpea-journal-ui--debug "Found %d entry days" (length days))
+                         (dolist (d days)
+                           (vulpea-journal-ui--debug "  Entry day: %s (type: %s)"
+                                                     (format-time-string "%Y-%m-%d" d)
+                                                     (type-of d)))
+                         days)))
+         ;; Today (actual current date)
+         (today (decode-time))
+         (today-day (decoded-time-day today))
+         (today-month (decoded-time-month today))
+         (today-year (decoded-time-year today))
+         ;; Day name headers
+         (day-names (if (= vulpea-journal-ui-calendar-week-start 1)
+                        '("Mo" "Tu" "We" "Th" "Fr" "Sa" "Su")
+                      '("Su" "Mo" "Tu" "We" "Th" "Fr" "Sa")))
+         ;; Column specs
+         (columns (--map (list :header it :width 5) day-names))
+         ;; Date selection handler
+         (on-select (lambda (new-date)
+                      (vulpea-journal-ui--visit-date new-date)))
+         ;; Build rows
+         (rows (vulpea-journal-ui--calendar-build-rows
+                display-month display-year
+                selected-day selected-month selected-year
+                entry-days
+                today-day today-month today-year on-select))
+         (month-name (calendar-month-name display-month))
+         ;; Navigation callbacks
+         (go-prev-month (lambda ()
+                          (vui-batch
+                           (vui-set-state :view-month (if (= display-month 1) 12 (1- display-month)))
+                           (vui-set-state :view-year (if (= display-month 1) (1- display-year) display-year)))))
+         (go-next-month (lambda ()
+                          (vui-batch
+                           (vui-set-state :view-month (if (= display-month 12) 1 (1+ display-month)))
+                           (vui-set-state :view-year (if (= display-month 12) (1+ display-year) display-year))))))
+    ;; Reset view-month/year when selected date changes to different month
+    (use-effect (selected-month selected-year)
+      (vui-batch
+       (vui-set-state :view-month nil)
+       (vui-set-state :view-year nil)))
 
-        (vui-component 'vulpea-ui-widget
-          :title "Calendar"
-          :children
-          (lambda ()
-            (vui-vstack
-             ;; Month/year header with navigation
-             (vui-hstack
-              :spacing 1
-              (vui-button "<" :on-click go-prev-month)
-              (vui-box (vui-text (format "%s %d" month-name display-year) :face 'bold)
-                :width 15
-                :align :center)
-              (vui-button ">" :on-click go-next-month))
-             (vui-newline)
-           ;; Calendar table
-           (vui-table
-            :columns columns
-            :rows rows)))))))
+    (vui-component 'vulpea-ui-widget
+      :title "Calendar"
+      :children
+      (lambda ()
+        (vui-vstack
+         ;; Month/year header with navigation
+         (vui-hstack
+          :spacing 1
+          (vui-button "<" :on-click go-prev-month)
+          (vui-box (vui-text (format "%s %d" month-name display-year) :face 'bold)
+            :width 15
+            :align :center)
+          (vui-button ">" :on-click go-next-month))
+         (vui-newline)
+         ;; Calendar table
+         (vui-table
+          :columns columns
+          :rows rows))))))
 
 
 ;;; Created Today Widget
@@ -421,29 +421,29 @@ ON-SELECT is callback to handle date selection."
       (lambda ()
         (if (null notes)
             (vui-text "No notes created today" :face 'shadow)
-          (vui-list notes
-                    (lambda (n)
-                      (let* ((title (vulpea-note-title n))
-                             (tags (vulpea-note-tags n))
-                             (created (alist-get 'CREATED (vulpea-note-properties n)))
-                             (time-str (if (and created (string-match "\\([0-9]+:[0-9]+\\)" created))
-                                           (match-string 1 created)
-                                         "     "))
-                             (visit-note (lambda ()
-                                           (let ((main-win (vulpea-ui--get-main-window)))
-                                             (when main-win (select-window main-win))
-                                             (vulpea-visit n)))))
-                        (vui-hstack
-                         :spacing 1
-                         (vui-text time-str :face 'shadow)
-                         (vui-button title
-                           :face 'link
-                           :on-click visit-note)
-                         (when tags
-                           (vui-text (string-join (--map (concat "#" it) tags) " ")
-                             :face 'shadow)))))
-                    #'vulpea-note-id))))))
-
+          (vui-list
+           notes
+           (lambda (n)
+             (let* ((title (vulpea-note-title n))
+                    (tags (vulpea-note-tags n))
+                    (created (alist-get 'CREATED (vulpea-note-properties n)))
+                    (time-str (if (and created (string-match "\\([0-9]+:[0-9]+\\)" created))
+                                  (match-string 1 created)
+                                "     "))
+                    (visit-note (lambda ()
+                                  (let ((main-win (vulpea-ui--get-main-window)))
+                                    (when main-win (select-window main-win))
+                                    (vulpea-visit n)))))
+               (vui-hstack
+                :spacing 1
+                (vui-text time-str :face 'shadow)
+                (vui-button title
+                  :face 'link
+                  :on-click visit-note)
+                (when tags
+                  (vui-text (string-join (--map (concat "#" it) tags) " ")
+                    :face 'shadow)))))
+           #'vulpea-note-id))))))
 
 ;;; Previous Years Widget
 
@@ -463,9 +463,9 @@ ON-SELECT is callback to handle date selection."
          (toggle-expanded (lambda ()
                             (vui-set-state :expanded (not expanded))))
          (visit-note (lambda ()
-                            (let ((main-win (vulpea-ui--get-main-window)))
-                              (when main-win (select-window main-win))
-                              (vulpea-visit note)))))
+                       (let ((main-win (vulpea-ui--get-main-window)))
+                         (when main-win (select-window main-win))
+                         (vulpea-visit note)))))
     (vui-vstack
      (vui-hstack
       :spacing 1
@@ -520,24 +520,24 @@ ON-SELECT is callback to handle date selection."
   (or (alist-get widget vulpea-journal-ui-widget-orders) 100))
 
 (vulpea-ui-register-widget 'journal-nav
-  :component 'vulpea-journal-widget-nav
-  :predicate #'vulpea-journal-note-p
-  :order (vulpea-journal-ui--get-order 'nav))
+                           :component 'vulpea-journal-widget-nav
+                           :predicate #'vulpea-journal-note-p
+                           :order (vulpea-journal-ui--get-order 'nav))
 
 (vulpea-ui-register-widget 'journal-calendar
-  :component 'vulpea-journal-widget-calendar
-  :predicate #'vulpea-journal-note-p
-  :order (vulpea-journal-ui--get-order 'calendar))
+                           :component 'vulpea-journal-widget-calendar
+                           :predicate #'vulpea-journal-note-p
+                           :order (vulpea-journal-ui--get-order 'calendar))
 
 (vulpea-ui-register-widget 'journal-created-today
-  :component 'vulpea-journal-widget-created-today
-  :predicate #'vulpea-journal-note-p
-  :order (vulpea-journal-ui--get-order 'created-today))
+                           :component 'vulpea-journal-widget-created-today
+                           :predicate #'vulpea-journal-note-p
+                           :order (vulpea-journal-ui--get-order 'created-today))
 
 (vulpea-ui-register-widget 'journal-previous-years
-  :component 'vulpea-journal-widget-previous-years
-  :predicate #'vulpea-journal-note-p
-  :order (vulpea-journal-ui--get-order 'previous-years))
+                           :component 'vulpea-journal-widget-previous-years
+                           :predicate #'vulpea-journal-note-p
+                           :order (vulpea-journal-ui--get-order 'previous-years))
 
 (provide 'vulpea-journal-ui)
 ;;; vulpea-journal-ui.el ends here
