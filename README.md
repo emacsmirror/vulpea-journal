@@ -33,20 +33,24 @@ vulpea-journal requires:
   (vulpea-journal-setup))
 ```
 
-### 2. Configure widgets
+### 2. Widgets are auto-registered
 
-Add journal widgets to your vulpea-ui sidebar:
+Journal widgets automatically register with vulpea-ui when you load `vulpea-journal-ui`. They only appear when viewing journal notes.
 
-```elisp
-(setq vulpea-ui-sidebar-widgets
-      '(vulpea-journal-widget-nav          ; Journal navigation header
-        vulpea-ui-widget-stats             ; Note statistics
-        vulpea-journal-widget-calendar     ; Interactive calendar
-        vulpea-ui-widget-outline           ; Document outline
-        vulpea-ui-widget-backlinks         ; Notes linking here
-        vulpea-journal-widget-created-today    ; Notes created on this date
-        vulpea-journal-widget-previous-years)) ; Same day in past years
-```
+Default widget order interleaves with vulpea-ui widgets:
+
+| Widget           | Order | Appears...              |
+|------------------|-------|-------------------------|
+| journal-nav      |    50 | Before stats            |
+| stats            |   100 | (vulpea-ui)             |
+| journal-calendar |   150 | After stats             |
+| outline          |   200 | (vulpea-ui)             |
+| backlinks        |   300 | (vulpea-ui)             |
+| created-today    |   350 | After backlinks         |
+| previous-years   |   360 | After created-today     |
+| links            |   400 | (vulpea-ui)             |
+
+To customize the order, see [Widget Order Configuration](#widget-order-configuration) below.
 
 ### 3. Add a keybinding
 
@@ -149,6 +153,32 @@ For more control, use a function:
 ;; Start with previews expanded
 (setq vulpea-journal-ui-previous-years-expanded t)  ; default: t
 ```
+
+### Widget Order Configuration
+
+Customize where journal widgets appear relative to vulpea-ui widgets:
+
+```elisp
+(setq vulpea-journal-ui-widget-orders
+      '((nav . 50)              ; before stats (100)
+        (calendar . 150)        ; after stats, before outline (200)
+        (created-today . 350)   ; after backlinks (300)
+        (previous-years . 360)))
+```
+
+Example: Move calendar before stats:
+
+```elisp
+(use-package vulpea-journal
+  :custom
+  (vulpea-journal-ui-widget-orders
+   '((nav . 50)
+     (calendar . 90)            ; now before stats
+     (created-today . 350)
+     (previous-years . 360))))
+```
+
+Reference orders for vulpea-ui widgets: stats=100, outline=200, backlinks=300, links=400.
 
 ## Commands
 
