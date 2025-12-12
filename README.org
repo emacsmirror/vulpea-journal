@@ -1,6 +1,12 @@
 #+title: vulpea-journal
 #+author: Boris Buliga
 
+#+begin_html
+<p>
+  <img alt="version" src="https://img.shields.io/github/v/tag/d12frosted/vulpea-journal?label=version"/>
+</p>
+#+end_html
+
 A daily journaling interface for [[https://github.com/d12frosted/vulpea][vulpea]] that integrates seamlessly with [[https://github.com/d12frosted/vulpea-ui][vulpea-ui]] sidebar.
 
 * What is vulpea-journal?
