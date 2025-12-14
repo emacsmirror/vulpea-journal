@@ -159,11 +159,7 @@ This is the date of the journal entry you are currently viewing."
   "Visit journal for DATE from sidebar context.
 Opens the note in the main window, not the sidebar."
   (require 'vulpea-journal)
-  (let ((note (vulpea-journal-note date))
-        (main-win (vulpea-ui--get-main-window)))
-    (when main-win
-      (select-window main-win))
-    (vulpea-visit note)))
+  (vulpea-ui-visit-note (vulpea-journal-note date)))
 
 (defun vulpea-journal-ui--strip-drawers (text)
   "Remove org drawers from TEXT."
@@ -512,6 +508,60 @@ ON-SELECT is callback to handle date selection."
                     (lambda (entry)
                       (format-time-string "%Y%m%d" (plist-get entry :date)))))))))
 
+
+;;; Sidebar Keybindings
+
+(declare-function vulpea-journal "vulpea-journal")
+(declare-function vulpea-journal-note-p "vulpea-journal")
+(declare-function vulpea-journal-note-date "vulpea-journal")
+(declare-function vulpea-journal--adjacent-date "vulpea-journal")
+(declare-function vulpea-journal--read-date "vulpea-journal")
+
+(defun vulpea-journal-ui--sidebar-note ()
+  "Get the current journal note from sidebar context.
+Works whether called from sidebar or main window."
+  (or vulpea-ui--current-note
+      (when-let ((main-win (vulpea-ui--get-main-window)))
+        (with-current-buffer (window-buffer main-win)
+          (when-let ((file (buffer-file-name)))
+            (car (vulpea-db-query-by-file-path file 0)))))))
+
+(defun vulpea-journal-ui-previous ()
+  "Navigate to the previous journal entry from sidebar."
+  (interactive)
+  (let ((note (vulpea-journal-ui--sidebar-note)))
+    (if (not (vulpea-journal-note-p note))
+        (user-error "Not viewing a journal note")
+      (if-let* ((current-date (vulpea-journal-note-date note))
+                (prev-date (vulpea-journal--adjacent-date current-date 'prev)))
+          (vulpea-journal-ui--visit-date prev-date)
+        (message "No previous journal entry")))))
+
+(defun vulpea-journal-ui-next ()
+  "Navigate to the next journal entry from sidebar."
+  (interactive)
+  (let ((note (vulpea-journal-ui--sidebar-note)))
+    (if (not (vulpea-journal-note-p note))
+        (user-error "Not viewing a journal note")
+      (if-let* ((current-date (vulpea-journal-note-date note))
+                (next-date (vulpea-journal--adjacent-date current-date 'next)))
+          (vulpea-journal-ui--visit-date next-date)
+        (message "No next journal entry")))))
+
+(defun vulpea-journal-ui-today ()
+  "Navigate to today's journal from sidebar."
+  (interactive)
+  (vulpea-journal-ui--visit-date (current-time)))
+
+(defun vulpea-journal-ui-date (date)
+  "Navigate to journal for DATE from sidebar."
+  (interactive (list (vulpea-journal--read-date)))
+  (vulpea-journal-ui--visit-date date))
+
+(define-key vulpea-ui-sidebar-mode-map (kbd "[") #'vulpea-journal-ui-previous)
+(define-key vulpea-ui-sidebar-mode-map (kbd "]") #'vulpea-journal-ui-next)
+(define-key vulpea-ui-sidebar-mode-map (kbd "t") #'vulpea-journal-ui-today)
+(define-key vulpea-ui-sidebar-mode-map (kbd "d") #'vulpea-journal-ui-date)
 
 ;;; Widget Registration
 

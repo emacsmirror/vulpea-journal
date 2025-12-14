@@ -2,6 +2,10 @@
 
 * Unreleased
 
+** Added
+
+- Sidebar keybindings for quick journal navigation: =[= (previous), =]= (next), =t= (today), =d= (pick date).
+
 * v1.0.0-rc.1
 
 Initial release candidate.

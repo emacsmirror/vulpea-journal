@@ -198,6 +198,17 @@ Reference orders for vulpea-ui widgets: stats=100, outline=200, backlinks=300, l
 | =vulpea-journal-previous= | Go to previous journal entry                            |
 | =vulpea-journal-setup=    | Enable calendar integration                             |
 
+* Sidebar Keybindings
+
+When viewing a journal note, the sidebar provides quick navigation:
+
+| Key | Action                         |
+|-----+--------------------------------|
+| =[= | Go to previous journal entry   |
+| =]= | Go to next journal entry       |
+| =t= | Go to today's journal          |
+| =d= | Pick a date                    |
+
 * Calendar Integration
 
 After calling =vulpea-journal-setup=, the Emacs calendar gains journal superpowers:
