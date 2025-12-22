@@ -448,10 +448,9 @@ This enables calendar marks and keybindings."
   (add-hook 'calendar-today-visible-hook #'vulpea-journal-calendar-mark-entries)
   (add-hook 'calendar-today-invisible-hook #'vulpea-journal-calendar-mark-entries)
   ;; Calendar keybindings
-  (with-eval-after-load 'calendar
-    (define-key calendar-mode-map (kbd "j") #'vulpea-journal-calendar-open)
-    (define-key calendar-mode-map (kbd "]") #'vulpea-journal-calendar-next)
-    (define-key calendar-mode-map (kbd "[") #'vulpea-journal-calendar-previous))
+  (define-key calendar-mode-map (kbd "j") #'vulpea-journal-calendar-open)
+  (define-key calendar-mode-map (kbd "]") #'vulpea-journal-calendar-next)
+  (define-key calendar-mode-map (kbd "[") #'vulpea-journal-calendar-previous)
   ;; Load UI module for sidebar widgets
   (require 'vulpea-journal-ui))
 
