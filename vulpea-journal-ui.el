@@ -1,6 +1,7 @@
 ;;; vulpea-journal-ui.el --- UI widgets for vulpea-journal -*- lexical-binding: t; -*-
 ;;
 ;; Copyright (c) 2024-2025 Boris Buliga <boris@d12frosted.io>
+;; SPDX-License-Identifier: GPL-3.0-or-later
 ;;
 ;; Author: Boris Buliga <boris@d12frosted.io>
 ;; Maintainer: Boris Buliga <boris@d12frosted.io>
