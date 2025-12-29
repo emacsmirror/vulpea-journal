@@ -335,7 +335,87 @@ To fix this, you have two options:
 
 2. *Delete and recreate:* If the files don't contain important content, delete them and let vulpea-journal create new ones.
 
-Additionally, if your notes lack the =CREATED= property, vulpea-journal won't find them for date-based queries (like "notes created today"). The note itself will work fine if opened directly. To add =CREATED= properties to existing notes, you can use a script or manually add them.
+Additionally, if your notes lack the =CREATED= property, vulpea-journal won't find them for date-based queries (like "notes created today"). The note itself will work fine if opened directly.
+
+** Migration script
+
+If you have many existing journal files that need =:ID:= and =CREATED= properties, you can use this script to migrate them automatically.
+
+*WARNING: Back up your notes before running this script!*
+
+#+begin_src emacs-lisp
+(defun vulpea-journal-migrate-files (directory)
+  "Migrate journal files in DIRECTORY to vulpea-journal format.
+
+Adds :ID: property if missing.
+Adds CREATED property if missing (inferred from filename or title).
+
+After running this, execute `vulpea-db-sync' to index the files."
+  (interactive "DJournal directory: ")
+  (let* ((files (directory-files directory t "\\.org$"))
+         (count (length files))
+         (modified 0)
+         (skipped 0))
+    (message "Processing %d files in %s..." count directory)
+    (dolist (file files)
+      (message "  Processing %s..." (file-name-nondirectory file))
+      (with-current-buffer (find-file-noselect file)
+        (let ((changed nil)
+              (filename (file-name-base file)))
+          ;; Check/add ID property
+          (goto-char (point-min))
+          (unless (org-entry-get (point) "ID")
+            (org-id-get-create)
+            (setq changed t)
+            (message "    Added ID"))
+          ;; Check/add CREATED property
+          (goto-char (point-min))
+          (unless (org-entry-get (point) "CREATED")
+            (when-let* ((date (vulpea-journal-migrate--infer-date file)))
+              (org-set-property "CREATED" date)
+              (setq changed t)
+              (message "    Added CREATED: %s" date)))
+          ;; Save if modified
+          (if changed
+              (progn
+                (save-buffer)
+                (setq modified (1+ modified)))
+            (setq skipped (1+ skipped)))
+          (kill-buffer))))
+    (message "Migration complete: %d modified, %d skipped" modified skipped)
+    (message "Run M-x vulpea-db-sync to index the migrated files.")))
+
+(defun vulpea-journal-migrate--infer-date (file)
+  "Infer date from FILE path or title.
+Returns date string in format [YYYY-MM-DD] or nil."
+  (let ((filename (file-name-base file)))
+    (cond
+     ;; Try common filename patterns: YYYYMMDD, YYYY-MM-DD, YYYY_MM_DD
+     ((string-match "\\([0-9]\\{4\\}\\)[_-]?\\([0-9]\\{2\\}\\)[_-]?\\([0-9]\\{2\\}\\)" filename)
+      (format "[%s-%s-%s]"
+              (match-string 1 filename)
+              (match-string 2 filename)
+              (match-string 3 filename)))
+     ;; Try reading title from file
+     (t
+      (with-temp-buffer
+        (insert-file-contents file)
+        (goto-char (point-min))
+        (when (re-search-forward "^#\\+title:[ \t]*\\(.+\\)" nil t)
+          (let ((title (match-string 1)))
+            (when (string-match "\\([0-9]\\{4\\}\\)[_-]?\\([0-9]\\{2\\}\\)[_-]?\\([0-9]\\{2\\}\\)" title)
+              (format "[%s-%s-%s]"
+                      (match-string 1 title)
+                      (match-string 2 title)
+                      (match-string 3 title))))))))))
+#+end_src
+
+Usage:
+
+1. Back up your journal directory
+2. Evaluate the code above
+3. Run =M-x vulpea-journal-migrate-files= and select your journal directory
+4. Run =M-x vulpea-db-sync= to index the migrated files
 
 * API Reference
 

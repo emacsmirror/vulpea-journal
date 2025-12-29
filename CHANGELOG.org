@@ -2,6 +2,10 @@
 
 * Unreleased
 
+** Added
+
+- Migration script in README to help users add =:ID:= and =CREATED= properties to existing journal files.
+
 ** Fixed
 
 - Navigating to a date with an existing file that is not in the vulpea database (e.g., manually created file without proper ID property) no longer overwrites the file. Instead, an error is signaled with instructions on how to resolve the situation.
