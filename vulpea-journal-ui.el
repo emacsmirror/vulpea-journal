@@ -63,7 +63,7 @@
 ;;; Customization
 
 (defgroup vulpea-journal-ui nil
-  "UI widgets for vulpea-journal."
+  "UI widgets for `vulpea-journal'."
   :group 'vulpea-journal)
 
 (defvar vulpea-journal-debug)

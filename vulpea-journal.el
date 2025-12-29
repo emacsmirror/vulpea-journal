@@ -148,7 +148,7 @@ Uses current time for template resolution."
 ;;; Debug
 
 (defvar vulpea-journal-debug nil
-  "Enable debug logging for vulpea-journal.")
+  "Enable debug logging for `vulpea-journal'.")
 
 (defun vulpea-journal--debug (format-string &rest args)
   "Log debug message using FORMAT-STRING and ARGS."
@@ -469,7 +469,7 @@ Marks entries for all visible months (previous, current, next)."
 
 ;;;###autoload
 (defun vulpea-journal-setup ()
-  "Set up vulpea-journal integration.
+  "Set up `vulpea-journal' integration.
 This enables calendar marks and keybindings."
   ;; Calendar hooks
   (add-hook 'calendar-today-visible-hook #'vulpea-journal-calendar-mark-entries)
