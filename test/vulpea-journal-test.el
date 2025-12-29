@@ -151,5 +151,26 @@
           (should found)
           (should (string= (vulpea-note-id found) (vulpea-note-id note))))))))
 
+(ert-deftest vulpea-journal-no-overwrite-existing-file ()
+  "Test that existing files not in database are not overwritten."
+  (vulpea-test--with-temp-db
+    (let* ((vulpea-journal-default-template '(:file-name "journal/%Y%m%d.org"
+                                              :title "%Y-%m-%d %A"
+                                              :tags ("journal")))
+           (date (encode-time 0 0 12 25 11 2024))
+           (file (vulpea-journal--file-for-date date))
+           (original-content "* My important notes\nDon't lose this!"))
+      ;; Create directory and file manually (simulating pre-existing file)
+      (make-directory (file-name-directory file) t)
+      (with-temp-file file
+        (insert original-content))
+      ;; Attempting to get journal note should error, not overwrite
+      (should-error (vulpea-journal-note date))
+      ;; Verify original content is preserved
+      (should (string= (with-temp-buffer
+                         (insert-file-contents file)
+                         (buffer-string))
+                       original-content)))))
+
 (provide 'vulpea-journal-test)
 ;;; vulpea-journal-test.el ends here

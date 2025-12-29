@@ -232,11 +232,19 @@ Returns time value or nil if date cannot be extracted."
       (vulpea-journal--create-note date)))
 
 (defun vulpea-journal--create-note (date)
-  "Create a new journal note for DATE."
+  "Create a new journal note for DATE.
+Signals an error if a file already exists at the target path but is
+not in the vulpea database (e.g., manually created file without
+proper org-roam/vulpea properties)."
   (let* ((tpl (vulpea-journal--get-template date))
          (file (vulpea-journal--file-for-date date))
          (title (vulpea-journal--title-for-date date))
          (id (org-id-new)))
+    (when (file-exists-p file)
+      (error "File %s already exists but is not in vulpea database.
+This can happen if the file was created manually or lacks required properties.
+To fix: either delete the file, or add it to vulpea by ensuring it has
+an ID property and running `vulpea-db-sync'" file))
     (vulpea-journal--ensure-directory file)
     (vulpea-create
      title

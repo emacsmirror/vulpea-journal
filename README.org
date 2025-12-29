@@ -325,11 +325,17 @@ Call =vulpea-journal-setup= in your config, or manually:
 (add-hook 'calendar-today-invisible-hook #'vulpea-journal-calendar-mark-entries)
 #+end_src
 
-** Old journal entries not found
+** Existing journal files not in database
 
-If you have existing journal notes without the CREATED property, vulpea-journal won't find them for queries. The note itself will work fine if opened directly.
+If you have existing journal files that are not properly indexed in the vulpea database (e.g., manually created files, or files without an =:ID:= property), vulpea-journal will show an error when you try to navigate to that date. This is a safety measure to prevent accidentally overwriting your files.
 
-To add CREATED properties to existing notes, you can use a script or manually add them.
+To fix this, you have two options:
+
+1. *Add proper properties and sync:* Ensure each file has an =:ID:= property in its property drawer, then run =M-x vulpea-db-sync= to index them.
+
+2. *Delete and recreate:* If the files don't contain important content, delete them and let vulpea-journal create new ones.
+
+Additionally, if your notes lack the =CREATED= property, vulpea-journal won't find them for date-based queries (like "notes created today"). The note itself will work fine if opened directly. To add =CREATED= properties to existing notes, you can use a script or manually add them.
 
 * API Reference
 

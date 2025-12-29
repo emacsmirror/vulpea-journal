@@ -4,6 +4,7 @@
 
 ** Fixed
 
+- Navigating to a date with an existing file that is not in the vulpea database (e.g., manually created file without proper ID property) no longer overwrites the file. Instead, an error is signaled with instructions on how to resolve the situation.
 - Calendar marking now shows journal entries in all visible months (previous, current, next), not just the current month.
 
 * v1.0.0-rc.2 (2025-12-14)
