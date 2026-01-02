@@ -5,6 +5,12 @@
 ** Added
 
 - Migration script in README to help users add =:ID:= and =CREATED= properties to existing journal files.
+- =vulpea-journal-calendar-mode= minor mode for calendar integration, providing idiomatic keybindings that can be toggled.
+
+** Changed
+
+- =vulpea-journal-setup= now uses =vulpea-journal-calendar-mode= via =calendar-mode-hook= instead of directly modifying =calendar-mode-map=.
+- Sidebar keybindings and widget registration moved from top-level to =vulpea-journal-ui-setup=, making =require= side-effect free.
 
 ** Fixed
 

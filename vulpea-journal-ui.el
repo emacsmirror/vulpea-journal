@@ -545,36 +545,46 @@ Works whether called from sidebar or main window."
   (interactive (list (vulpea-journal--read-date)))
   (vulpea-journal-ui--visit-date date))
 
-(define-key vulpea-ui-sidebar-mode-map (kbd "[") #'vulpea-journal-ui-previous)
-(define-key vulpea-ui-sidebar-mode-map (kbd "]") #'vulpea-journal-ui-next)
-(define-key vulpea-ui-sidebar-mode-map (kbd "t") #'vulpea-journal-ui-today)
-(define-key vulpea-ui-sidebar-mode-map (kbd "d") #'vulpea-journal-ui-date)
-
 ;;; Widget Registration
 
 (defun vulpea-journal-ui--get-order (widget)
   "Get order for WIDGET from `vulpea-journal-ui-widget-orders'."
   (or (alist-get widget vulpea-journal-ui-widget-orders) 100))
 
-(vulpea-ui-register-widget 'journal-nav
-                           :component 'vulpea-journal-widget-nav
-                           :predicate #'vulpea-journal-note-p
-                           :order (vulpea-journal-ui--get-order 'nav))
 
-(vulpea-ui-register-widget 'journal-calendar
-                           :component 'vulpea-journal-widget-calendar
-                           :predicate #'vulpea-journal-note-p
-                           :order (vulpea-journal-ui--get-order 'calendar))
+;;; Setup
 
-(vulpea-ui-register-widget 'journal-created-today
-                           :component 'vulpea-journal-widget-created-today
-                           :predicate #'vulpea-journal-note-p
-                           :order (vulpea-journal-ui--get-order 'created-today))
+(defvar vulpea-journal-ui--setup-done nil
+  "Non-nil if `vulpea-journal-ui-setup' has been called.")
 
-(vulpea-ui-register-widget 'journal-previous-years
-                           :component 'vulpea-journal-widget-previous-years
-                           :predicate #'vulpea-journal-note-p
-                           :order (vulpea-journal-ui--get-order 'previous-years))
+(defun vulpea-journal-ui-setup ()
+  "Set up journal UI integration.
+Registers sidebar keybindings and journal widgets.
+This function is idempotent."
+  (unless vulpea-journal-ui--setup-done
+    ;; Sidebar keybindings
+    (define-key vulpea-ui-sidebar-mode-map (kbd "[") #'vulpea-journal-ui-previous)
+    (define-key vulpea-ui-sidebar-mode-map (kbd "]") #'vulpea-journal-ui-next)
+    (define-key vulpea-ui-sidebar-mode-map (kbd "t") #'vulpea-journal-ui-today)
+    (define-key vulpea-ui-sidebar-mode-map (kbd "d") #'vulpea-journal-ui-date)
+    ;; Widget registration
+    (vulpea-ui-register-widget 'journal-nav
+                               :component 'vulpea-journal-widget-nav
+                               :predicate #'vulpea-journal-note-p
+                               :order (vulpea-journal-ui--get-order 'nav))
+    (vulpea-ui-register-widget 'journal-calendar
+                               :component 'vulpea-journal-widget-calendar
+                               :predicate #'vulpea-journal-note-p
+                               :order (vulpea-journal-ui--get-order 'calendar))
+    (vulpea-ui-register-widget 'journal-created-today
+                               :component 'vulpea-journal-widget-created-today
+                               :predicate #'vulpea-journal-note-p
+                               :order (vulpea-journal-ui--get-order 'created-today))
+    (vulpea-ui-register-widget 'journal-previous-years
+                               :component 'vulpea-journal-widget-previous-years
+                               :predicate #'vulpea-journal-note-p
+                               :order (vulpea-journal-ui--get-order 'previous-years))
+    (setq vulpea-journal-ui--setup-done t)))
 
 (provide 'vulpea-journal-ui)
 ;;; vulpea-journal-ui.el ends here

@@ -196,7 +196,7 @@ Reference orders for vulpea-ui widgets: stats=100, outline=200, backlinks=300, l
 | =vulpea-journal-date=     | Prompt for a date and open its journal                  |
 | =vulpea-journal-next=     | Go to next journal entry                                |
 | =vulpea-journal-previous= | Go to previous journal entry                            |
-| =vulpea-journal-setup=    | Enable calendar integration                             |
+| =vulpea-journal-setup=    | Enable calendar/sidebar integration and register widgets |
 
 * Sidebar Keybindings
 
@@ -211,7 +211,7 @@ When viewing a journal note, the sidebar provides quick navigation:
 
 * Calendar Integration
 
-After calling =vulpea-journal-setup=, the Emacs calendar gains journal superpowers:
+After calling =vulpea-journal-setup=, the Emacs calendar gains journal superpowers via =vulpea-journal-calendar-mode=:
 
 | Key | Action                         |
 |-----+--------------------------------|
@@ -220,6 +220,8 @@ After calling =vulpea-journal-setup=, the Emacs calendar gains journal superpowe
 | =[= | Jump to previous journal entry |
 
 Days with journal entries are highlighted in the calendar.
+
+The minor mode is automatically enabled in calendar buffers. You can toggle it with =M-x vulpea-journal-calendar-mode= if needed.
 
 * Widgets Reference
 
@@ -318,12 +320,19 @@ Supported formats:
 
 ** Calendar marks don't appear
 
-Call =vulpea-journal-setup= in your config, or manually:
+Ensure =vulpea-journal-setup= is called in your config. This adds the necessary hooks:
 
 #+begin_src emacs-lisp
 (add-hook 'calendar-today-visible-hook #'vulpea-journal-calendar-mark-entries)
 (add-hook 'calendar-today-invisible-hook #'vulpea-journal-calendar-mark-entries)
 #+end_src
+
+** Calendar keybindings don't work
+
+=vulpea-journal-setup= enables =vulpea-journal-calendar-mode= in calendar buffers. If keybindings aren't working:
+
+1. Verify the minor mode is active by running =M-x vulpea-journal-calendar-mode= to toggle it
+2. Ensure =vulpea-journal-setup= was called before opening the calendar
 
 ** Existing journal files not in database
 

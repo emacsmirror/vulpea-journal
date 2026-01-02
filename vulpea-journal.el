@@ -465,21 +465,50 @@ Marks entries for all visible months (previous, current, next)."
       (message "No previous journal entry"))))
 
 
+;;; Calendar Minor Mode
+
+(defvar vulpea-journal-calendar-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "j") #'vulpea-journal-calendar-open)
+    (define-key map (kbd "]") #'vulpea-journal-calendar-next)
+    (define-key map (kbd "[") #'vulpea-journal-calendar-previous)
+    map)
+  "Keymap for `vulpea-journal-calendar-mode'.")
+
+(define-minor-mode vulpea-journal-calendar-mode
+  "Minor mode for journal integration in calendar buffers.
+Provides keybindings for navigating journal entries from the calendar.
+
+\\{vulpea-journal-calendar-mode-map}"
+  :lighter nil
+  :keymap vulpea-journal-calendar-mode-map)
+
+
 ;;; Setup
 
 ;;;###autoload
 (defun vulpea-journal-setup ()
   "Set up `vulpea-journal' integration.
-This enables calendar marks and keybindings."
-  ;; Calendar hooks
+
+This function configures:
+
+1. Calendar integration - enables `vulpea-journal-calendar-mode' in
+   calendar buffers, providing keybindings for opening and navigating
+   journal entries.  Also marks days with journal entries.
+
+2. Sidebar keybindings - adds journal navigation keys to
+   `vulpea-ui-sidebar-mode-map'.
+
+3. Sidebar widgets - registers journal-specific widgets (navigation,
+   calendar, created today, previous years) with `vulpea-ui'."
+  ;; Calendar hooks for marking entries
   (add-hook 'calendar-today-visible-hook #'vulpea-journal-calendar-mark-entries)
   (add-hook 'calendar-today-invisible-hook #'vulpea-journal-calendar-mark-entries)
-  ;; Calendar keybindings
-  (define-key calendar-mode-map (kbd "j") #'vulpea-journal-calendar-open)
-  (define-key calendar-mode-map (kbd "]") #'vulpea-journal-calendar-next)
-  (define-key calendar-mode-map (kbd "[") #'vulpea-journal-calendar-previous)
-  ;; Load UI module for sidebar widgets
-  (require 'vulpea-journal-ui))
+  ;; Enable calendar minor mode
+  (add-hook 'calendar-mode-hook #'vulpea-journal-calendar-mode)
+  ;; Load and setup UI module for sidebar widgets
+  (require 'vulpea-journal-ui)
+  (vulpea-journal-ui-setup))
 
 (provide 'vulpea-journal)
 ;;; vulpea-journal.el ends here
