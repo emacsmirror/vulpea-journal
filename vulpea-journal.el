@@ -58,6 +58,8 @@
 (require 'dash)
 (require 'calendar)
 
+(declare-function vulpea-journal-ui-setup "vulpea-journal-ui")
+
 (defvar vulpea-directory)
 
 
