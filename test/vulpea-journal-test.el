@@ -1,6 +1,6 @@
 ;;; vulpea-journal-test.el --- Tests for vulpea-journal -*- lexical-binding: t; -*-
 ;;
-;; Copyright (c) 2024-2025 Boris Buliga <boris@d12frosted.io>
+;; Copyright (c) 2024-2026 Boris Buliga <boris@d12frosted.io>
 ;;
 ;; This program is free software; you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
