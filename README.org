@@ -3,6 +3,8 @@
 
 #+begin_html
 <p>
+  <a href="https://melpa.org/#/vulpea-journal"><img alt="MELPA" src="https://melpa.org/packages/vulpea-journal-badge.svg"/></a>
+  <a href="https://github.com/d12frosted/vulpea-journal/actions/workflows/main.yml"><img alt="CI" src="https://github.com/d12frosted/vulpea-journal/actions/workflows/main.yml/badge.svg"/></a>
   <img alt="version" src="https://img.shields.io/github/v/tag/d12frosted/vulpea-journal?label=version"/>
 </p>
 #+end_html
@@ -28,13 +30,31 @@ vulpea-journal brings the power of daily journaling to your vulpea-based note sy
 vulpea-journal requires:
 - Emacs 29.1+
 - [[https://github.com/d12frosted/vulpea][vulpea]] 2.0+
-- [[https://github.com/d12frosted/vulpea-ui][vulpea-ui]] 0.1+
+- [[https://github.com/d12frosted/vulpea-ui][vulpea-ui]] 1.0+
 - [[https://github.com/magnars/dash.el][dash]] 2.20+
 
+*** Using package.el (MELPA)
+
 #+begin_src emacs-lisp
-;; With use-package and straight.el
+(package-install 'vulpea-journal)
+#+end_src
+
+*** Using straight.el
+
+#+begin_src emacs-lisp
+(straight-use-package 'vulpea-journal)
+#+end_src
+
+*** Using elpaca
+
+#+begin_src emacs-lisp
+(elpaca vulpea-journal)
+#+end_src
+
+*** Configuration
+
+#+begin_src emacs-lisp
 (use-package vulpea-journal
-  :straight (:host github :repo "d12frosted/vulpea-journal")
   :after (vulpea vulpea-ui)
   :config
   (vulpea-journal-setup))

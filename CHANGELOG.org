@@ -2,46 +2,24 @@
 
 * Unreleased
 
-** Added
+* v1.0.0 (2026-01-12)
 
-- Migration script in README to help users add =:ID:= and =CREATED= properties to existing journal files.
-- =vulpea-journal-calendar-mode= minor mode for calendar integration, providing idiomatic keybindings that can be toggled.
-
-** Changed
-
-- =vulpea-journal-setup= now uses =vulpea-journal-calendar-mode= via =calendar-mode-hook= instead of directly modifying =calendar-mode-map=.
-- Sidebar keybindings and widget registration moved from top-level to =vulpea-journal-ui-setup=, making =require= side-effect free.
-
-** Fixed
-
-- Navigating to a date with an existing file that is not in the vulpea database (e.g., manually created file without proper ID property) no longer overwrites the file. Instead, an error is signaled with instructions on how to resolve the situation.
-- Calendar marking now shows journal entries in all visible months (previous, current, next), not just the current month.
-
-* v1.0.0-rc.2 (2025-12-14)
-
-** Added
-
-- Sidebar keybindings for quick journal navigation: =[= (previous), =]= (next), =t= (today), =d= (pick date).
-
-** Changed
-
-- Use =vulpea-ui-clean-org-markup= for preview cleaning in previous years widget.
-
-* v1.0.0-rc.1 (2025-12-12)
-
-Initial release candidate.
+Initial stable release.
 
 ** Features
 
 - Daily journaling with one file per day, automatically created with customizable templates
 - Seamless integration with [[https://github.com/d12frosted/vulpea-ui][vulpea-ui]] sidebar
-- Reactive widgets built on [[https://github.com/d12frosted/vulpea-ui][vui.el]]:
+- Reactive widgets built on [[https://github.com/d12frosted/vui][vui.el]]:
   - *Navigation* - prev/today/next buttons for quick navigation between journal entries
   - *Calendar* - monthly view with entry indicators, click to jump to any date
   - *Previous Years* - "on this day" view showing entries from past years with preview
   - *Created Today* - notes created on the current journal date
 - Customizable templates for file paths and titles
 - Automatic widget registration with vulpea-ui
+- Sidebar keybindings for quick journal navigation: =[= (previous), =]= (next), =t= (today), =d= (pick date)
+- =vulpea-journal-calendar-mode= minor mode for calendar integration, providing idiomatic keybindings that can be toggled
+- Migration script in README to help users add =:ID:= and =CREATED= properties to existing journal files
 
 ** Performance
 
@@ -53,5 +31,5 @@ Initial release candidate.
 
 - Emacs 29.1+
 - vulpea 2.0+
-- vulpea-ui 0.1+
+- vulpea-ui 1.0+
 - dash 2.20+
